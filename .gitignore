@@ -8,3 +8,9 @@ node_modules
 *.sqlite
 *.sqlite-journal
 .DS_Store
+
+# Local archives of node_modules and similar. Archive.zip was committed by
+# accident at 167 MB — past GitHub's 100 MB hard limit, so it blocked every
+# push until it was stripped from history. Everything in it is regenerable
+# from pnpm-lock.yaml.
+*.zip
