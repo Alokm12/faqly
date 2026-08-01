@@ -1,0 +1,141 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "a3c5ed95b28d9315d9f9f7fcd80abea8"
+name = "Faqly"
+application_url = "https://example.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_products,write_metaobjects,write_metaobject_definitions"
+
+[auth]
+redirect_urls = [ "https://example.com/api/auth" ]
+
+[app_proxy]
+url = "https://example.com/apps/faqly"
+subpath = "faqly"
+prefix = "apps"
+
+[product.metafields.app.demo_info]
+type = "single_line_text_field"
+name = "Demo Source Info"
+description = "Tracks products created by the Shopify app template for development"
+
+  [product.metafields.app.demo_info.access]
+  admin = "merchant_read_write"
+
+[metaobjects.app.faq]
+name = "FAQ"
+description = "Frequently asked questions shown on the storefront"
+
+  [metaobjects.app.faq.access]
+  admin = "merchant_read_write"
+  storefront = "public_read"
+
+  [metaobjects.app.faq.capabilities]
+  publishable = true
+
+[metaobjects.app.faq.fields.question]
+name = "Question"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.faq.fields.answer]
+name = "Answer"
+type = "multi_line_text_field"
+required = true
+
+[metaobjects.app.faq.fields.status]
+name = "Status"
+type = "single_line_text_field"
+
+[metaobjects.app.faq.fields.position]
+name = "Position"
+type = "number_integer"
+
+[metaobjects.app.faq.fields.category]
+name = "Category"
+type = "metaobject_reference<$app:faq_category>"
+
+[metaobjects.app.faq.fields.products]
+name = "Products"
+type = "list.product_reference"
+
+[metaobjects.app.faq.fields.collections]
+name = "Collections"
+type = "list.collection_reference"
+
+[metaobjects.app.faq_category]
+name = "FAQ Category"
+description = "Groups FAQs into categories"
+
+  [metaobjects.app.faq_category.access]
+  admin = "merchant_read_write"
+  storefront = "public_read"
+
+  [metaobjects.app.faq_category.capabilities]
+  publishable = true
+
+[metaobjects.app.faq_category.fields.name]
+name = "Name"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.faq_category.fields.icon]
+name = "Icon"
+type = "single_line_text_field"
+
+[metaobjects.app.faq_category.fields.icon_image_url]
+name = "Icon Image URL"
+type = "single_line_text_field"
+
+[metaobjects.app.faq_category.fields.color]
+name = "Color"
+type = "single_line_text_field"
+
+[metaobjects.app.faq_category.fields.position]
+name = "Position"
+type = "number_integer"
+
+[metaobjects.app.faq_settings]
+name = "FAQ Settings"
+description = "App-wide Faqly settings, one entry per store"
+
+  [metaobjects.app.faq_settings.access]
+  admin = "merchant_read_write"
+
+[metaobjects.app.faq_settings.fields.powered_by_visible]
+name = "Powered by visible"
+type = "boolean"
+
+[metaobjects.app.faq_settings.fields.schema_enabled]
+name = "Schema enabled"
+type = "boolean"
+
+[metaobjects.app.faq_settings.fields.feedback_enabled]
+name = "Feedback enabled"
+type = "boolean"
+
+[metaobjects.app.faq_settings.fields.analytics_enabled]
+name = "Analytics enabled"
+type = "boolean"
+
+[metaobjects.app.faq_settings.fields.default_status]
+name = "Default status"
+type = "single_line_text_field"

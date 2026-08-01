@@ -1,0 +1,307 @@
+{{ 'faqly-widget.css' | asset_url | stylesheet_tag }}
+
+{% comment %}
+  Faqly — FAQ Widget (Theme App Extension block)
+  "Verdant"-style layout: eyebrow badge, two-part serif heading, subtitle,
+  pill filter, circular +/- accordion toggles, and now a "Still have
+  questions?" support CTA card at the bottom. FAQ content itself is
+  fetched client-side from the App Proxy endpoint by faqly-widget.js —
+  everything else here is static block-settings markup.
+{% endcomment %}
+
+<div
+  class="faqly-widget"
+  data-faqly-widget
+  data-product-id="{{ product.id }}"
+  data-collection-ids="{{ product.collections | map: 'id' | join: ',' }}"
+  data-empty-text="{{ block.settings.empty_state_text | escape }}"
+  data-loading-text="{{ block.settings.loading_text | escape }}"
+  data-all-tab-label="{{ block.settings.all_tab_label | escape }}"
+  data-credit-text="{{ block.settings.credit_text | escape }}"
+  data-show-credit="{{ block.settings.show_credit }}"
+  style="
+    --faqly-accent: {{ block.settings.accent_color }};
+    --faqly-font-size: {{ block.settings.font_size }}px;
+    --faqly-radius-widget: {{ block.settings.radius_widget }}px;
+    --faqly-radius-tabbar: {{ block.settings.radius_tabbar }}px;
+    --faqly-radius-pill: {{ block.settings.radius_pill }}px;
+    --faqly-radius-card: {{ block.settings.radius_card }}px;
+    --faqly-radius-button: {{ block.settings.radius_button }}px;
+    --faqly-radius-icon: {{ block.settings.radius_icon }}%;
+  "
+  {{ block.shopify_attributes }}
+>
+  {% if block.settings.eyebrow_text != blank %}
+    <div class="faqly-widget__eyebrow">
+      <span class="faqly-widget__eyebrow-dot"></span>
+      {{ block.settings.eyebrow_text }}
+    </div>
+  {% endif %}
+
+  {% if block.settings.title_line1 != blank or block.settings.title_accent != blank %}
+    <h2 class="faqly-widget__title">
+      {% if block.settings.title_line1 != blank %}
+        <span class="faqly-widget__title-line">{{ block.settings.title_line1 }}</span>
+      {% endif %}
+      {% if block.settings.title_accent != blank %}
+        <span class="faqly-widget__title-accent">{{ block.settings.title_accent }}</span>
+      {% endif %}
+    </h2>
+  {% endif %}
+
+  {% if block.settings.subtitle != blank %}
+    <p class="faqly-widget__subtitle">{{ block.settings.subtitle }}</p>
+  {% endif %}
+
+  <div class="faqly-pills" data-faqly-pills></div>
+  <div class="faqly-widget__list" data-faqly-list>
+    <p class="faqly-widget__loading">{{ block.settings.loading_text }}</p>
+  </div>
+
+  {% if block.settings.show_cta %}
+    <div class="faqly-cta">
+      {% if block.settings.cta_icon != blank %}
+        <div class="faqly-cta__icon">{{ block.settings.cta_icon }}</div>
+      {% endif %}
+      {% if block.settings.cta_heading != blank %}
+        <h3 class="faqly-cta__heading">{{ block.settings.cta_heading }}</h3>
+      {% endif %}
+      {% if block.settings.cta_subtitle != blank %}
+        <p class="faqly-cta__subtitle">{{ block.settings.cta_subtitle }}</p>
+      {% endif %}
+      {% if block.settings.cta_primary_text != blank or block.settings.cta_secondary_text != blank %}
+        <div class="faqly-cta__actions">
+          {% if block.settings.cta_primary_text != blank %}
+            <a
+              class="faqly-cta__button faqly-cta__button--primary"
+              href="{{ block.settings.cta_primary_url | default: '#' }}"
+            >
+              {{ block.settings.cta_primary_text }}
+            </a>
+          {% endif %}
+          {% if block.settings.cta_secondary_text != blank %}
+            <a
+              class="faqly-cta__button faqly-cta__button--secondary"
+              href="{{ block.settings.cta_secondary_url | default: '#' }}"
+            >
+              {{ block.settings.cta_secondary_text }}
+            </a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+
+<script src="{{ 'faqly-widget.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Faqly FAQ Widget",
+  "target": "section",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Header text"
+    },
+    {
+      "type": "text",
+      "id": "eyebrow_text",
+      "label": "Eyebrow badge text",
+      "default": "Help Center"
+    },
+    {
+      "type": "text",
+      "id": "title_line1",
+      "label": "Heading (line 1)",
+      "default": "Frequently asked"
+    },
+    {
+      "type": "text",
+      "id": "title_accent",
+      "label": "Heading accent word (italic, colored)",
+      "default": "questions"
+    },
+    {
+      "type": "text",
+      "id": "subtitle",
+      "label": "Subtitle",
+      "default": "Everything you need to know. Can't find an answer? Our team is always happy to help."
+    },
+    {
+      "type": "header",
+      "content": "Category filter"
+    },
+    {
+      "type": "text",
+      "id": "all_tab_label",
+      "label": "\"Show all\" tab label",
+      "default": "All"
+    },
+    {
+      "type": "header",
+      "content": "States"
+    },
+    {
+      "type": "text",
+      "id": "loading_text",
+      "label": "Loading text",
+      "default": "Loading FAQs\u2026"
+    },
+    {
+      "type": "text",
+      "id": "empty_state_text",
+      "label": "Text when no FAQs apply",
+      "default": "No FAQs available for this page yet."
+    },
+    {
+      "type": "header",
+      "content": "Support CTA card"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_cta",
+      "label": "Show \"Still have questions?\" card",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "cta_icon",
+      "label": "Icon (emoji)",
+      "default": "\ud83d\udcac"
+    },
+    {
+      "type": "text",
+      "id": "cta_heading",
+      "label": "Heading",
+      "default": "Still have questions?"
+    },
+    {
+      "type": "text",
+      "id": "cta_subtitle",
+      "label": "Subtitle",
+      "default": "Our support team typically replies within a few hours on business days."
+    },
+    {
+      "type": "text",
+      "id": "cta_primary_text",
+      "label": "Primary button text",
+      "default": "Chat with us"
+    },
+    {
+      "type": "url",
+      "id": "cta_primary_url",
+      "label": "Primary button link"
+    },
+    {
+      "type": "text",
+      "id": "cta_secondary_text",
+      "label": "Secondary button text",
+      "default": "Browse docs"
+    },
+    {
+      "type": "url",
+      "id": "cta_secondary_url",
+      "label": "Secondary button link"
+    },
+    {
+      "type": "header",
+      "content": "Footer credit"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_credit",
+      "label": "Show \"Powered by\" credit line",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "credit_text",
+      "label": "Credit text",
+      "default": "Powered by Faqly"
+    },
+    {
+      "type": "header",
+      "content": "Appearance"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Accent color",
+      "default": "#4A5D3A"
+    },
+    {
+      "type": "range",
+      "id": "font_size",
+      "label": "Font size",
+      "min": 12,
+      "max": 22,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "radius_widget",
+      "label": "Roundness: widget container",
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 21
+    },
+    {
+      "type": "range",
+      "id": "radius_tabbar",
+      "label": "Roundness: tab bar",
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 50,
+      "info": "50px reads as a fully rounded pill at this height."
+    },
+    {
+      "type": "range",
+      "id": "radius_pill",
+      "label": "Roundness: tabs + eyebrow badge",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "radius_card",
+      "label": "Roundness: FAQ + CTA cards",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "range",
+      "id": "radius_button",
+      "label": "Roundness: CTA buttons",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "radius_icon",
+      "label": "Roundness: icons",
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "unit": "%",
+      "default": 50,
+      "info": "50% is a circle, 0% is a square. The CTA card icon stays slightly squarer than the rest."
+    }
+  ]
+}
+{% endschema %}

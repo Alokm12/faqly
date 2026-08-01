@@ -1,0 +1,462 @@
+.faqly-widget {
+  max-width: 780px;
+  margin: 3rem auto;
+  padding: 3rem 2rem;
+  border-radius: var(--faqly-radius-widget, 21px);
+  background: linear-gradient(180deg, #EEF3E7 0%, #F6F8F2 100%);
+  font-family: inherit;
+  font-size: var(--faqly-font-size, 16px);
+  --faqly-bg: #F6F8F2;
+  --faqly-border: rgba(74, 93, 58, 0.12);
+  --faqly-ink: #23301a;
+}
+
+/* --- Eyebrow badge --- */
+
+.faqly-widget__eyebrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: fit-content;
+  margin: 0 auto 1.5rem;
+  padding: 0.4rem 1rem;
+  border-radius: var(--faqly-radius-pill, 999px);
+  background: color-mix(in srgb, var(--faqly-accent, #4A5D3A) 12%, white);
+  color: var(--faqly-accent, #4A5D3A);
+  font-size: 0.75em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.faqly-widget__eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--faqly-accent, #4A5D3A);
+}
+
+/* --- Heading --- */
+
+.faqly-widget__title {
+  margin: 0 0 1rem;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.faqly-widget__title-line {
+  display: block;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: 2.4em;
+  color: var(--faqly-ink);
+  letter-spacing: -0.01em;
+}
+
+.faqly-widget__title-accent {
+  display: block;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-style: italic;
+  font-size: 2.6em;
+  color: var(--faqly-accent, #4A5D3A);
+}
+
+.faqly-widget__subtitle {
+  max-width: 480px;
+  margin: 0 auto 2rem;
+  text-align: center;
+  color: #6b7a5f;
+  font-size: 1em;
+  line-height: 1.6;
+}
+
+.faqly-widget__loading,
+.faqly-widget__empty {
+  color: #8a9a7c;
+  font-size: 0.95em;
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.faqly-widget__credit {
+  text-align: center;
+  font-size: 0.75em;
+  color: #8a9a7c;
+  margin: 1.5rem 0 0;
+}
+
+.faqly-widget__credit a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* --- Category filter pills ---
+   Pill-shaped container, individual tabs plain text on transparent
+   background, the active tab gets a clean white pill behind it — no
+   colored fill, matching the reference's understated tab style. */
+
+.faqly-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  justify-content: center;
+  align-items: center;
+  /* fit-content shrinks the tab bar to the width of the tabs inside it
+     instead of stretching the full widget width, which was leaving dead
+     space on both ends; margin auto re-centres it. Deliberately still
+     `display: flex` and not `inline-flex`, because faqly-widget.js sets
+     an inline `display: flex` at runtime that would override it. */
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 1.75rem;
+  padding: 0.4rem;
+  background: color-mix(in srgb, var(--faqly-accent, #4A5D3A) 6%, white);
+  border-radius: var(--faqly-radius-tabbar, 999px);
+  border: 1px solid var(--faqly-border);
+}
+
+.faqly-pill {
+  --faqly-pill-color: var(--faqly-accent, #4A5D3A);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--faqly-radius-pill, 999px);
+  border: 1px solid transparent;
+  background: transparent;
+  color: #6b7a5f;
+  font-size: 0.85em;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.18s ease, color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+/* The default browser focus ring on <button> elements is a thick,
+   dark, high-contrast outline meant for arbitrary unstyled buttons —
+   it was showing up as an ugly dark box around whichever tab was last
+   clicked/focused. Replacing it with a slim ring in the widget's own
+   accent color keeps keyboard-accessibility intact without looking
+   like a rendering bug. */
+.faqly-pill:focus-visible {
+  outline: 2px solid var(--faqly-pill-color);
+  outline-offset: 2px;
+}
+
+.faqly-pill:hover {
+  color: var(--faqly-pill-color);
+}
+
+.faqly-pill--active {
+  background: #ffffff;
+  border-color: rgba(35, 48, 26, 0.1);
+  color: var(--faqly-ink);
+  box-shadow: 0 1px 4px rgba(35, 48, 26, 0.12), 0 0 0 1px rgba(35, 48, 26, 0.04);
+}
+
+.faqly-pill__icon {
+  font-size: 0.95em;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+/* --- Category sections --- */
+
+.faqly-category {
+  --faqly-category-color: var(--faqly-accent, #4A5D3A);
+  margin-bottom: 2rem;
+}
+
+.faqly-category:last-child {
+  margin-bottom: 0;
+}
+
+.faqly-category__header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.85rem;
+}
+
+.faqly-category__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8em;
+  height: 1.8em;
+  border-radius: var(--faqly-radius-icon, 50%);
+  background: color-mix(in srgb, var(--faqly-category-color) 14%, white);
+  font-size: 1em;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.faqly-category__title {
+  font-size: 1em;
+  font-weight: 700;
+  margin: 0;
+  color: var(--faqly-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.faqly-category__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* --- Accordion items --- */
+
+.faqly-item {
+  border: 1px solid var(--faqly-border);
+  border-radius: var(--faqly-radius-card, 14px);
+  background: #ffffff;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.faqly-item--open {
+  border-color: color-mix(in srgb, var(--faqly-category-color) 30%, var(--faqly-border));
+  box-shadow: 0 6px 20px rgba(35, 48, 26, 0.07);
+}
+
+.faqly-item__question {
+  width: 100%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem 1.4rem;
+  font-weight: 600;
+  font-size: 0.98em;
+  color: var(--faqly-ink);
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: inherit;
+}
+
+.faqly-item__question:focus-visible {
+  outline: 2px solid var(--faqly-category-color, var(--faqly-accent, #4A5D3A));
+  outline-offset: 2px;
+  border-radius: var(--faqly-radius-card, 14px);
+}
+
+/* Circular +/- toggle: two bars (horizontal + vertical) forming a plus
+   sign when closed. The vertical bar scales to zero height when open,
+   leaving just the horizontal bar — a plus-to-minus morph — while the
+   circle itself switches from a light tint to a solid filled color. */
+
+.faqly-item__icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 2em;
+  height: 2em;
+  border-radius: var(--faqly-radius-icon, 50%);
+  background: color-mix(in srgb, var(--faqly-category-color) 12%, white);
+  transition: background-color 0.2s ease;
+}
+
+.faqly-item--open .faqly-item__icon {
+  background: var(--faqly-category-color, var(--faqly-accent, #4A5D3A));
+}
+
+.faqly-item__icon::before,
+.faqly-item__icon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: var(--faqly-category-color, var(--faqly-accent, #4A5D3A));
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.faqly-item__icon::before {
+  width: 0.7em;
+  height: 2px;
+  transform: translate(-50%, -50%);
+}
+
+.faqly-item__icon::after {
+  width: 2px;
+  height: 0.7em;
+  transform: translate(-50%, -50%);
+}
+
+.faqly-item--open .faqly-item__icon::before,
+.faqly-item--open .faqly-item__icon::after {
+  background: #ffffff;
+}
+
+.faqly-item--open .faqly-item__icon::after {
+  transform: translate(-50%, -50%) scaleY(0);
+}
+
+/* The animated wrapper: height and opacity both transition together so
+   content fades in as it expands, rather than popping open instantly. */
+.faqly-item__answer-wrap {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  border-top: 1px solid var(--faqly-border);
+  transition: max-height 0.28s ease, opacity 0.22s ease;
+}
+
+.faqly-item__answer {
+  padding: 1rem 1.4rem 1.3rem;
+  color: #5b6a4f;
+  line-height: 1.7;
+  font-size: 0.92em;
+}
+
+.faqly-item__answer p {
+  margin: 0 0 0.6rem;
+}
+
+.faqly-item__answer p:last-child {
+  margin-bottom: 0;
+}
+
+.faqly-item__answer ul,
+.faqly-item__answer ol {
+  margin: 0 0 0.6rem;
+  padding-left: 1.25rem;
+}
+
+.faqly-item__answer u {
+  text-decoration: underline;
+}
+
+.faqly-item__answer strong {
+  font-weight: 700;
+  color: var(--faqly-ink);
+}
+
+/* --- Support CTA card --- */
+
+.faqly-cta {
+  margin-top: 2.5rem;
+  padding: 2.5rem 2rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--faqly-accent, #4A5D3A) 4%, white);
+  border: 1px solid var(--faqly-border);
+  border-radius: var(--faqly-radius-card, 14px);
+}
+
+.faqly-cta__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75em;
+  height: 2.75em;
+  margin: 0 auto 1rem;
+  border-radius: calc(var(--faqly-radius-icon, 50%) * 0.6);
+  background: var(--faqly-accent, #4A5D3A);
+  font-size: 1.1em;
+}
+
+.faqly-cta__heading {
+  margin: 0 0 0.5rem;
+  font-size: 1.2em;
+  font-weight: 700;
+  color: var(--faqly-ink);
+}
+
+.faqly-cta__subtitle {
+  max-width: 380px;
+  margin: 0 auto 1.5rem;
+  color: #6b7a5f;
+  font-size: 0.9em;
+  line-height: 1.6;
+}
+
+.faqly-cta__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.faqly-cta__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.4rem;
+  border-radius: var(--faqly-radius-button, 8px);
+  font-size: 0.88em;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.faqly-cta__button--primary {
+  background: var(--faqly-accent, #4A5D3A);
+  color: #ffffff;
+  border: 1px solid var(--faqly-accent, #4A5D3A);
+}
+
+.faqly-cta__button--primary:hover {
+  opacity: 0.9;
+}
+
+.faqly-cta__button--secondary {
+  background: transparent;
+  color: var(--faqly-ink);
+  border: 1px solid var(--faqly-border);
+}
+
+.faqly-cta__button--secondary:hover {
+  background: color-mix(in srgb, var(--faqly-accent, #4A5D3A) 6%, transparent);
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 480px) {
+  .faqly-widget {
+    margin: 2rem auto;
+    padding: 2rem 1.25rem;
+  }
+
+  .faqly-widget__title-line,
+  .faqly-widget__title-accent {
+    font-size: 1.7em;
+  }
+
+  .faqly-pills {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .faqly-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .faqly-pill {
+    flex-shrink: 0;
+    font-size: 0.78em;
+    padding: 0.5rem 1rem;
+  }
+
+  .faqly-item__question {
+    font-size: 0.9em;
+    padding: 0.95rem 1.1rem;
+  }
+
+  .faqly-cta {
+    padding: 2rem 1.25rem;
+    margin-top: 2rem;
+  }
+}

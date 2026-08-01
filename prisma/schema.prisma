@@ -1,0 +1,155 @@
+// Faqly data layer.
+//
+// ARCHITECTURE NOTE — why this file exists at all now:
+// FAQs, Categories and Settings used to live *only* in Shopify
+// app-reserved metaobjects ("$app:faq"). App-reserved data is owned by the
+// app installation: Shopify deletes the definition and every entry inside
+// it shortly after the app is uninstalled, and changing a field key/type
+// in shopify.app.toml can drop values across all entries. That is why
+// content kept vanishing during development.
+//
+// This database is now the source of truth. Metaobjects are an OPTIONAL
+// write-through mirror (see app/services/metaobject-sync.server.js),
+// switched on with FAQLY_METAOBJECT_MIRROR=true, and only useful if you
+// later want to server-render FAQs in Liquid for SEO. The storefront
+// widget reads the App Proxy, so nothing on the storefront depends on the
+// mirror today.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// DEV: sqlite, no environment variable needed.
+//
+// PRODUCTION: switch to managed Postgres by changing these two lines to
+//   provider = "postgresql"
+//   url      = env("DATABASE_URL")
+// and re-running `npx prisma migrate dev --name init`. SQLite on an
+// ephemeral filesystem (Fly/Render/Railway) is wiped on every redeploy,
+// taking every session and every FAQ with it.
+//
+// The models below deliberately avoid Json columns and enums so the exact
+// same file works on both engines.
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+
+  @@index([shop])
+}
+
+/// One row per store. Uninstall marks `uninstalledAt` instead of deleting
+/// anything, so a merchant who reinstalls gets all their FAQs back — a real
+/// retention win over apps that start you from zero.
+model Shop {
+  domain        String    @id
+  installedAt   DateTime  @default(now())
+  uninstalledAt DateTime?
+  lastSyncAt    DateTime?
+  lastSyncError String?
+
+  faqs       Faq[]
+  categories Category[]
+  setting    Setting?
+}
+
+model Category {
+  id     String @id @default(cuid())
+  shop   String
+  /// URL-safe slug, unique per shop. Kept as the public identifier so the
+  /// existing /app/categories/:handle routes and every FAQ's categoryHandle
+  /// keep working unchanged.
+  handle String
+
+  name         String
+  icon         String  @default("")
+  iconImageUrl String  @default("")
+  color        String  @default("")
+  position     Int     @default(0)
+  /// Storefront visibility. Previously derived from the metaobject's
+  /// `publishable` capability; now an explicit column so it can't drift.
+  visible      Boolean @default(true)
+
+  /// GID of the mirrored metaobject, when the mirror is enabled. Null just
+  /// means "not mirrored yet" — never a data-loss condition.
+  metaobjectId String?
+  syncedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shopRecord Shop  @relation(fields: [shop], references: [domain], onDelete: Cascade)
+  faqs       Faq[]
+
+  @@unique([shop, handle])
+  @@index([shop, position])
+}
+
+model Faq {
+  id     String @id @default(cuid())
+  shop   String
+  handle String
+
+  question String
+  answer   String
+  /// "DRAFT" | "PUBLISHED" — see app/models/faq-status.js. Kept as a String
+  /// rather than an enum so the schema stays sqlite-compatible.
+  status   String @default("DRAFT")
+  position Int    @default(0)
+
+  categoryId String?
+
+  /// JSON-encoded arrays of Shopify GIDs. Stored as text (not Json) for
+  /// sqlite compatibility; always read/written through the helpers in
+  /// Faq.server.js so callers never touch the raw string.
+  productIds    String @default("[]")
+  collectionIds String @default("[]")
+
+  metaobjectId String?
+  syncedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shopRecord Shop      @relation(fields: [shop], references: [domain], onDelete: Cascade)
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@unique([shop, handle])
+  @@index([shop, position])
+  @@index([shop, status])
+  @@index([categoryId])
+}
+
+model Setting {
+  shop String @id
+
+  poweredByVisible Boolean @default(true)
+  schemaEnabled    Boolean @default(false)
+  feedbackEnabled  Boolean @default(false)
+  analyticsEnabled Boolean @default(true)
+  defaultStatus    String  @default("DRAFT")
+
+  updatedAt DateTime @updatedAt
+
+  shopRecord Shop @relation(fields: [shop], references: [domain], onDelete: Cascade)
+}
