@@ -7,71 +7,167 @@
 // driven by JS reading the content's natural scrollHeight. Only one item
 // stays open at a time within a given category list — opening a new one
 // closes whichever was previously open in that same list.
+//
+// Security note — read before editing renderAnswer/appendInline:
+// This file deliberately contains NO innerHTML assignment. Answers are
+// merchant-authored free text that renders on every product page, so a
+// stored <script> here would execute in every shopper's browser. The
+// previous version built an HTML string and escaped it first, which was
+// correct but only by convention — reordering two lines turned it into
+// stored XSS with nothing to catch it. Markdown is now applied by
+// *constructing DOM nodes*: merchant text only ever reaches the page via
+// createTextNode/textContent, so it is structurally incapable of being
+// parsed as markup. Keep it that way. If you need a new inline style,
+// add a tag to the INLINE_TAGS switch — never go back to string
+// concatenation.
 
 (function () {
-  function escapeHtml(str) {
-    var div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
+  // Formatting is a client-side cost paid on every product-page view.
+  // Past this length the lazy-quantifier scan below is no longer worth
+  // the main-thread time (and is the only place a pathological answer
+  // could cause backtracking), so very long answers render as plain
+  // text rather than blocking paint.
+  var MAX_MARKDOWN_LENGTH = 20000;
+  var MAX_INLINE_DEPTH = 3;
+
+  // Merchant-supplied category colors are written into a CSS custom
+  // property. Custom properties accept nearly any token stream, so an
+  // unvalidated value can smuggle url(...) into whatever property
+  // consumes it — an outbound request from every product page. The admin
+  // form validates hex, but backup imports are arbitrary uploaded JSON,
+  // so the storefront validates independently. 3- and 6-digit only.
+  var HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+  var idCounter = 0;
+
+  function safeColor(value) {
+    if (typeof value !== "string") return "";
+    var trimmed = value.trim();
+    return HEX_COLOR.test(trimmed) ? trimmed : "";
+  }
+
+  function clear(node) {
+    while (node.firstChild) node.removeChild(node.firstChild);
   }
 
   /**
-   * Renders a small, safe subset of markdown: **bold**, *italic*, and
-   * "- " bullet lines. HTML is escaped FIRST, so any literal <, >, &, or
-   * quote characters in a merchant's answer can never be interpreted as
-   * markup — only our own bold/italic/underline/bullet syntax (applied
-   * into real tags. This is the same reason the answer stays plain text
-   * in the database rather than storing raw HTML from a rich-text editor.
+   * Applies the inline subset — **bold**, __underline__, *italic* — by
+   * appending real elements and text nodes to `parent`.
+   *
+   * A single left-to-right alternation replaces the old three sequential
+   * .replace() passes. Besides removing the HTML string, it fixes the
+   * crossed-tag bug those passes had: "__a**b__c**" used to emit
+   * <u>a<strong>b</u>c</strong> — invalid nesting that each browser
+   * silently repaired into something the merchant didn't write. One scan
+   * can't cross tags; overlapping markers now render as literal text,
+   * which is at least the same everywhere.
+   *
+   * The ***bold italic*** branch is listed first and is not redundant:
+   * without it the ** branch wins, leaving a stray "*" in the output.
+   * The old code got this shape only as a side effect of the browser
+   * repairing <strong><em>x</strong></em>.
+   *
+   * The regex is created per call because it carries /g state and this
+   * function recurses.
    */
-  function renderMarkdownLite(text) {
-    var escaped = escapeHtml(text || "");
-    var lines = escaped.split("\n");
-    var html = "";
-    var listMode = null; // null | "ul" | "ol"
+  function appendInline(parent, str, depth) {
+    var pattern = /\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|__(.+?)__|\*(.+?)\*/g;
+    var cursor = 0;
+    var match;
 
-    function closeList() {
-      if (listMode) {
-        html += listMode === "ul" ? "</ul>" : "</ol>";
-        listMode = null;
+    while ((match = pattern.exec(str)) !== null) {
+      if (match.index > cursor) {
+        parent.appendChild(
+          document.createTextNode(str.slice(cursor, match.index)),
+        );
       }
+
+      var tag = "em";
+      var content = match[4];
+      var wrapInEm = false;
+      if (match[1] !== undefined) {
+        tag = "strong";
+        content = match[1];
+        wrapInEm = true;
+      } else if (match[2] !== undefined) {
+        tag = "strong";
+        content = match[2];
+      } else if (match[3] !== undefined) {
+        tag = "u";
+        content = match[3];
+      }
+
+      var node = document.createElement(tag);
+      var target = node;
+      if (wrapInEm) {
+        target = document.createElement("em");
+        node.appendChild(target);
+      }
+      if (depth < MAX_INLINE_DEPTH) {
+        appendInline(target, content, depth + 1);
+      } else {
+        target.appendChild(document.createTextNode(content));
+      }
+      parent.appendChild(node);
+      cursor = pattern.lastIndex;
     }
 
-    lines.forEach(function (line) {
-      var bulletMatch = line.match(/^-\s+(.*)/);
-      var numberedMatch = line.match(/^\d+\.\s+(.*)/);
-
-      if (bulletMatch) {
-        if (listMode !== "ul") {
-          closeList();
-          html += "<ul>";
-          listMode = "ul";
-        }
-        html += "<li>" + inlineFormat(bulletMatch[1]) + "</li>";
-      } else if (numberedMatch) {
-        if (listMode !== "ol") {
-          closeList();
-          html += "<ol>";
-          listMode = "ol";
-        }
-        html += "<li>" + inlineFormat(numberedMatch[1]) + "</li>";
-      } else {
-        closeList();
-        if (line.trim() === "") {
-          html += "<br>";
-        } else {
-          html += "<p>" + inlineFormat(line) + "</p>";
-        }
-      }
-    });
-    closeList();
-    return html;
+    if (cursor < str.length) {
+      parent.appendChild(document.createTextNode(str.slice(cursor)));
+    }
   }
 
-  function inlineFormat(str) {
-    return str
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/__(.+?)__/g, "<u>$1</u>")
-      .replace(/\*(.+?)\*/g, "<em>$1</em>");
+  /**
+   * Renders a small, safe subset of markdown as a DocumentFragment:
+   * **bold**, __underline__, *italic*, "- " bullets and "1. " numbered
+   * lists. Blank lines become <br>, everything else a <p> — same output
+   * as the previous string builder, minus the string.
+   */
+  function renderAnswer(text) {
+    var frag = document.createDocumentFragment();
+    var source = typeof text === "string" ? text : String(text || "");
+
+    if (source.length > MAX_MARKDOWN_LENGTH) {
+      var plain = document.createElement("p");
+      plain.textContent = source;
+      frag.appendChild(plain);
+      return frag;
+    }
+
+    var list = null;
+    var listTag = null;
+
+    source.split("\n").forEach(function (line) {
+      var bulletMatch = line.match(/^-\s+(.*)/);
+      var numberedMatch = line.match(/^\d+\.\s+(.*)/);
+      var wantedTag = bulletMatch ? "ul" : numberedMatch ? "ol" : null;
+
+      if (wantedTag) {
+        if (listTag !== wantedTag) {
+          list = document.createElement(wantedTag);
+          listTag = wantedTag;
+          frag.appendChild(list);
+        }
+        var li = document.createElement("li");
+        appendInline(li, (bulletMatch || numberedMatch)[1], 0);
+        list.appendChild(li);
+        return;
+      }
+
+      list = null;
+      listTag = null;
+
+      if (line.trim() === "") {
+        frag.appendChild(document.createElement("br"));
+        return;
+      }
+
+      var p = document.createElement("p");
+      appendInline(p, line, 0);
+      frag.appendChild(p);
+    });
+
+    return frag;
   }
 
   function el(tag, className, text) {
@@ -82,7 +178,7 @@
   }
 
   function renderMessage(container, message) {
-    container.innerHTML = "";
+    clear(container);
     container.appendChild(el("p", "faqly-widget__empty", message));
   }
 
@@ -91,6 +187,7 @@
     var button = item.querySelector(".faqly-item__question");
     wrap.style.maxHeight = "0px";
     wrap.style.opacity = "0";
+    wrap.setAttribute("aria-hidden", "true");
     button.setAttribute("aria-expanded", "false");
     item.classList.remove("faqly-item--open");
   }
@@ -101,6 +198,7 @@
     var button = item.querySelector(".faqly-item__question");
     wrap.style.maxHeight = inner.scrollHeight + 40 + "px";
     wrap.style.opacity = "1";
+    wrap.removeAttribute("aria-hidden");
     button.setAttribute("aria-expanded", "true");
     item.classList.add("faqly-item--open");
   }
@@ -108,19 +206,31 @@
   function renderAccordionItem(faq, list) {
     var item = el("div", "faqly-item");
 
+    // Screen readers need the button and the panel it controls wired
+    // together explicitly — the visual nesting means nothing to them.
+    idCounter += 1;
+    var buttonId = "faqly-q-" + idCounter;
+    var panelId = "faqly-a-" + idCounter;
+
     var button = el("button", "faqly-item__question");
     button.type = "button";
+    button.id = buttonId;
     button.setAttribute("aria-expanded", "false");
+    button.setAttribute("aria-controls", panelId);
     button.appendChild(document.createTextNode(faq.question));
     var icon = el("span", "faqly-item__icon");
     icon.setAttribute("aria-hidden", "true");
     button.appendChild(icon);
 
     var wrap = el("div", "faqly-item__answer-wrap");
+    wrap.id = panelId;
+    wrap.setAttribute("role", "region");
+    wrap.setAttribute("aria-labelledby", buttonId);
+    wrap.setAttribute("aria-hidden", "true");
     wrap.style.maxHeight = "0px";
     wrap.style.opacity = "0";
     var answer = el("div", "faqly-item__answer");
-    answer.innerHTML = renderMarkdownLite(faq.answer);
+    answer.appendChild(renderAnswer(faq.answer));
     wrap.appendChild(answer);
 
     button.addEventListener("click", function () {
@@ -144,8 +254,9 @@
   function renderCategorySection(category, showHeading) {
     var section = el("div", "faqly-category");
     section.setAttribute("data-faqly-category-section", category.key);
-    if (category.color) {
-      section.style.setProperty("--faqly-category-color", category.color);
+    var color = safeColor(category.color);
+    if (color) {
+      section.style.setProperty("--faqly-category-color", color);
     }
 
     if (showHeading) {
@@ -168,7 +279,7 @@
 
   function renderPills(widgetEl, categories, onSelect, allTabLabel) {
     var pillsEl = widgetEl.querySelector("[data-faqly-pills]");
-    pillsEl.innerHTML = "";
+    clear(pillsEl);
 
     if (categories.length <= 1) {
       pillsEl.style.display = "none";
@@ -180,14 +291,17 @@
     function makePill(label, key, icon, color) {
       var pill = el("button", "faqly-pill", "");
       pill.type = "button";
-      if (color) pill.style.setProperty("--faqly-pill-color", color);
+      var safe = safeColor(color);
+      if (safe) pill.style.setProperty("--faqly-pill-color", safe);
       if (icon) pill.appendChild(el("span", "faqly-pill__icon", icon));
       pill.appendChild(el("span", "faqly-pill__label", label));
       pill.addEventListener("click", function () {
         pillsEl.querySelectorAll(".faqly-pill").forEach(function (p) {
           p.classList.remove("faqly-pill--active");
+          p.setAttribute("aria-pressed", "false");
         });
         pill.classList.add("faqly-pill--active");
+        pill.setAttribute("aria-pressed", "true");
         onSelect(key);
       });
       return pill;
@@ -203,18 +317,24 @@
     if (hasAllTab) {
       var allPill = makePill(allTabLabel, "__all__", "", "");
       allPill.classList.add("faqly-pill--active");
+      allPill.setAttribute("aria-pressed", "true");
       pillsEl.appendChild(allPill);
     }
 
     categories.forEach(function (category, index) {
-      var pill = makePill(category.name, category.key, category.icon, category.color);
+      var pill = makePill(
+        category.name,
+        category.key,
+        category.icon,
+        category.color,
+      );
       // With no "All" tab, the first category tab is the default view —
       // mark it active so the page never loads with every tab looking
       // unselected (which read as a bug, not an intentional "show all"
       // state).
-      if (!hasAllTab && index === 0) {
-        pill.classList.add("faqly-pill--active");
-      }
+      var isDefault = !hasAllTab && index === 0;
+      if (isDefault) pill.classList.add("faqly-pill--active");
+      pill.setAttribute("aria-pressed", isDefault ? "true" : "false");
       pillsEl.appendChild(pill);
     });
 
@@ -289,7 +409,7 @@
         }
 
         function renderAll(filterKey) {
-          listEl.innerHTML = "";
+          clear(listEl);
           var toShow =
             filterKey === "__all__"
               ? categories

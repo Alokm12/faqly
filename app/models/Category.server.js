@@ -11,6 +11,59 @@ import {
   syncCategoryDeletion,
 } from "../services/metaobject-sync.server";
 
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * A category color ends up inside a CSS custom property on the
+ * storefront (`--faqly-category-color`). Custom properties accept almost
+ * any token stream, so an unvalidated value can smuggle a `url(...)` into
+ * whatever declaration consumes it — an outbound request fired from every
+ * product page carrying the widget.
+ *
+ * `validateCategory` already rejects non-hex on the admin form, but the
+ * form is not the only writer: JSON backup import (app.data.jsx) accepts
+ * an arbitrary uploaded file, and a merchant importing a FAQ set someone
+ * emailed them is a realistic path for a hostile value. So sanitizing
+ * happens at the model layer, where every write goes through it, rather
+ * than at each caller. Anything that isn't a 6-digit hex becomes "" —
+ * the widget then falls back to the theme's accent color.
+ */
+export function sanitizeHexColor(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  return HEX_COLOR.test(trimmed) ? trimmed : "";
+}
+
+/**
+ * Same reasoning as sanitizeHexColor, for the category icon image.
+ *
+ * The upload route hands back a Shopify CDN URL, but that value makes a
+ * round trip through a hidden form field before it gets here, and the
+ * backup importer writes it straight from an uploaded file — so by the
+ * time it reaches this layer it is an arbitrary merchant-controlled
+ * string, not something the app produced. It ends up in an `<img src>` in
+ * the admin, where a `javascript:` URL does not execute, but a `data:` or
+ * third-party URL still turns every category list render into an outbound
+ * request we didn't intend.
+ *
+ * This used to live in backup.server.js, which meant the one writer that
+ * happened to be audited was protected and the two ordinary ones weren't.
+ * Sanitizing here covers every write path by construction.
+ */
+export function sanitizeImageUrl(value) {
+  if (typeof value !== "string" || !value.trim()) return "";
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.toString()
+      : "";
+  } catch {
+    // Not an absolute URL. Relative paths are never legitimate here — the
+    // only writer that should succeed is the CDN upload — so reject.
+    return "";
+  }
+}
+
 function normalizeCategory(row) {
   return {
     id: row.id,
@@ -60,8 +113,8 @@ export async function saveCategory(handle, category, ctx) {
   const data = {
     name: category.name,
     icon: category.icon || "",
-    iconImageUrl: category.iconImageUrl || "",
-    color: category.color || "",
+    iconImageUrl: sanitizeImageUrl(category.iconImageUrl),
+    color: sanitizeHexColor(category.color),
   };
   if (category.position !== undefined) {
     data.position = Number(category.position) || 0;
@@ -90,10 +143,10 @@ export async function updateCategoryFields(id, fields, ctx) {
   const data = {};
   if (fields.position !== undefined) data.position = Number(fields.position) || 0;
   if (fields.name !== undefined) data.name = String(fields.name);
-  if (fields.color !== undefined) data.color = String(fields.color);
+  if (fields.color !== undefined) data.color = sanitizeHexColor(fields.color);
   if (fields.icon !== undefined) data.icon = String(fields.icon);
   if (fields.iconImageUrl !== undefined) {
-    data.iconImageUrl = String(fields.iconImageUrl);
+    data.iconImageUrl = sanitizeImageUrl(fields.iconImageUrl);
   }
 
   if (!Object.keys(data).length) return null;

@@ -9,6 +9,7 @@
 //     migration path for merchants arriving from a competitor's app.
 
 import prisma from "../db.server";
+import { sanitizeHexColor, sanitizeImageUrl } from "../models/Category.server";
 
 export const BACKUP_VERSION = 1;
 
@@ -66,6 +67,16 @@ export async function exportBackup(ctx) {
 }
 
 /**
+ * Import is the loudest untrusted-input path in the app: the payload is a
+ * JSON file the merchant uploaded, and "here's our FAQ export, just import
+ * it" is a plausible way to hand someone a hostile file. Everything
+ * written below is treated as attacker-controlled, not as data this app
+ * produced.
+ *
+ * The two field-level sanitizers that needs (color, icon URL) live in
+ * Category.server.js rather than here, so the admin form and this importer
+ * cannot drift apart — see the comments there for what each defends.
+ *
  * @param {object} payload Parsed backup JSON.
  * @param {object} ctx
  * @param {"skip"|"overwrite"} mode  How to treat handles that already exist.
@@ -112,10 +123,10 @@ export async function importBackup(payload, ctx, mode = "skip") {
     }
 
     const data = {
-      name: c.name ?? c.handle,
-      icon: c.icon ?? "",
-      iconImageUrl: sameShop ? (c.iconImageUrl ?? "") : "",
-      color: c.color ?? "",
+      name: String(c.name ?? c.handle),
+      icon: String(c.icon ?? ""),
+      iconImageUrl: sameShop ? sanitizeImageUrl(c.iconImageUrl) : "",
+      color: sanitizeHexColor(c.color),
       position: Number(c.position) || 0,
       visible: c.visible !== false,
     };
@@ -142,8 +153,8 @@ export async function importBackup(payload, ctx, mode = "skip") {
     }
 
     const data = {
-      question: f.question,
-      answer: f.answer ?? "",
+      question: String(f.question),
+      answer: String(f.answer ?? ""),
       status: f.status === "PUBLISHED" ? "PUBLISHED" : "DRAFT",
       position: Number(f.position) || 0,
       categoryId: f.categoryHandle

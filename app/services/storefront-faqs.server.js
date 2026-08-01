@@ -8,6 +8,7 @@
 
 import prisma from "../db.server";
 import { SETTINGS_DEFAULTS } from "../models/Settings.server";
+import { sanitizeHexColor } from "../models/Category.server";
 
 function parseIds(value) {
   if (!value) return [];
@@ -68,10 +69,20 @@ export async function getStorefrontFaqs(shop, { productId, collectionIds }) {
     return false;
   });
 
+  // The color is re-sanitized on the way out even though every write path
+  // already sanitizes it. Rows written before that validation existed are
+  // still in merchants' databases, and this is the last hop before the
+  // value becomes a CSS custom property in a shopper's browser — cheap
+  // insurance at the trust boundary rather than trusting our own table.
   const meta = new Map(
     categories.map((c) => [
       c.handle,
-      { name: c.name, icon: c.icon, iconImageUrl: c.iconImageUrl, color: c.color },
+      {
+        name: c.name,
+        icon: c.icon,
+        iconImageUrl: c.iconImageUrl,
+        color: sanitizeHexColor(c.color),
+      },
     ]),
   );
 

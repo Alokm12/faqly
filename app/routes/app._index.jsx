@@ -21,6 +21,10 @@ import {
   reorderCategories,
 } from "../models/Category.server";
 import { FaqStatus } from "../models/faq-status";
+import {
+  getWidgetThemeStatus,
+  buildWidgetDeepLink,
+} from "../services/theme-widget.server";
 import { PortalMenu } from "../components/PortalMenu";
 
 const APP_VERSION = "1.0.0";
@@ -28,11 +32,21 @@ const APP_VERSION = "1.0.0";
 export const loader = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
   const ctx = await dataContext({ session, admin });
-  const [faqs, categories] = await Promise.all([
+  const [faqs, categories, widget] = await Promise.all([
     getFaqs(ctx),
     getCategories(ctx),
+    // Never throws — returns { status: "unknown" } on any failure, which
+    // renders no banner. See services/theme-widget.server.js.
+    getWidgetThemeStatus(ctx.graphql),
   ]);
-  return { faqs, categories };
+  return {
+    faqs,
+    categories,
+    widget: {
+      ...widget,
+      deepLink: buildWidgetDeepLink(session.shop),
+    },
+  };
 };
 
 export const action = async ({ request }) => {
@@ -177,6 +191,34 @@ const NoSearchResults = () => (
     </s-grid>
   </s-section>
 );
+
+/**
+ * Shown only when we positively know the app block is absent from the live
+ * theme ("missing"). "unknown" — no read_themes scope, API hiccup — renders
+ * nothing, because a wrong "your widget is off" is worse than silence.
+ *
+ * The button is a Theme Editor deep link, so the merchant lands with the
+ * block already staged instead of hunting for it in the Add block list.
+ * target="_blank" is required: the admin renders us in an iframe, and the
+ * theme editor refuses to load inside one.
+ */
+function WidgetNotInstalledBanner({ widget }) {
+  if (widget?.status !== "missing" || !widget.deepLink) return null;
+
+  return (
+    <s-banner tone="warning" heading="Your FAQ widget isn't on your live theme yet">
+      <s-paragraph>
+        FAQs you create here won't appear on your storefront until the Faqly
+        block is added to
+        {widget.themeName ? ` your live theme (${widget.themeName})` : " your live theme"}.
+        Adding it takes one click — then hit Save in the theme editor.
+      </s-paragraph>
+      <s-button slot="primary-action" href={widget.deepLink} target="_blank" variant="primary">
+        Add widget to theme
+      </s-button>
+    </s-banner>
+  );
+}
 
 function StatCard({ label, value, bg, accent }) {
   return (
@@ -575,7 +617,7 @@ function AppFooter() {
 }
 
 export default function Index() {
-  const { faqs, categories } = useLoaderData();
+  const { faqs, categories, widget } = useLoaderData();
   const shopify = useAppBridge();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -621,6 +663,11 @@ export default function Index() {
       <s-button slot="primary-action" href="/app/faqs/new" variant="primary">
         Create FAQ
       </s-button>
+
+      {/* Outside the empty/non-empty branch on purpose: a store with zero
+          FAQs still needs to know the block is missing, and a store with
+          fifty needs it even more. */}
+      <WidgetNotInstalledBanner widget={widget} />
 
       {faqs.length === 0 ? (
         <EmptyFaqState />

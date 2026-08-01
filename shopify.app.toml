@@ -22,7 +22,10 @@ api_version = "2026-10"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products,write_metaobjects,write_metaobject_definitions"
+# read_themes: lets the dashboard check whether the FAQ widget app block is
+# actually present on the live theme, so we can deep-link merchants to the
+# theme editor when it isn't. Read-only — we never write theme files.
+scopes = "write_products,write_metaobjects,write_metaobject_definitions,read_themes"
 
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]
