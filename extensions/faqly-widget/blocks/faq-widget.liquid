@@ -28,18 +28,18 @@
   data-all-tab-label="{{ block.settings.all_tab_label | escape }}"
   data-credit-text="{{ block.settings.credit_text | escape }}"
   data-show-credit="{{ block.settings.show_credit }}"
-  style="
-    --faqly-accent: {{ block.settings.accent_color }};
-    --faqly-font-size: {{ block.settings.font_size }}px;
-    --faqly-radius-widget: {{ block.settings.radius_widget }}px;
-    --faqly-radius-tabbar: {{ block.settings.radius_tabbar }}px;
-    --faqly-radius-pill: {{ block.settings.radius_pill }}px;
-    --faqly-radius-card: {{ block.settings.radius_card }}px;
-    --faqly-radius-button: {{ block.settings.radius_button }}px;
-    --faqly-radius-icon: {{ block.settings.radius_icon }}%;
-  "
   {{ block.shopify_attributes }}
 >
+  {% comment %}
+    Appearance no longer comes from block settings. The custom properties
+    that used to be written here are declared in faqly-widget.css instead,
+    and faqly-widget.js overwrites them from the App Proxy payload once it
+    lands. The stylesheet defaults are identical to the old block-schema
+    defaults, so the widget paints correctly before the fetch resolves and
+    there is no flash of unstyled content — only, at most, a flash of
+    default-coloured content on a store that changed the accent.
+  {% endcomment %}
+
   {% if block.settings.eyebrow_text != blank %}
     <div class="faqly-widget__eyebrow">
       <span class="faqly-widget__eyebrow-dot"></span>
@@ -61,6 +61,15 @@
   {% if block.settings.subtitle != blank %}
     <p class="faqly-widget__subtitle">{{ block.settings.subtitle | escape }}</p>
   {% endif %}
+
+  {% comment %}
+    The search field is built by faqly-widget.js, not here: whether it
+    appears at all and what its placeholder says are app settings that
+    arrive with the FAQ payload, and rendering an input in Liquid that the
+    script might immediately remove would flash a control the merchant
+    turned off. This is just the mount point.
+  {% endcomment %}
+  <div class="faqly-search" data-faqly-search hidden></div>
 
   <div class="faqly-pills" data-faqly-pills></div>
   <div class="faqly-widget__list" data-faqly-list>
@@ -231,85 +240,8 @@
     },
     {
       "type": "header",
-      "content": "Appearance"
-    },
-    {
-      "type": "color",
-      "id": "accent_color",
-      "label": "Accent color",
-      "default": "#4A5D3A"
-    },
-    {
-      "type": "range",
-      "id": "font_size",
-      "label": "Font size",
-      "min": 12,
-      "max": 22,
-      "step": 1,
-      "unit": "px",
-      "default": 16
-    },
-    {
-      "type": "range",
-      "id": "radius_widget",
-      "label": "Roundness: widget container",
-      "min": 0,
-      "max": 60,
-      "step": 1,
-      "unit": "px",
-      "default": 21
-    },
-    {
-      "type": "range",
-      "id": "radius_tabbar",
-      "label": "Roundness: tab bar",
-      "min": 0,
-      "max": 60,
-      "step": 1,
-      "unit": "px",
-      "default": 50,
-      "info": "50px reads as a fully rounded pill at this height."
-    },
-    {
-      "type": "range",
-      "id": "radius_pill",
-      "label": "Roundness: tabs + eyebrow badge",
-      "min": 0,
-      "max": 40,
-      "step": 1,
-      "unit": "px",
-      "default": 40
-    },
-    {
-      "type": "range",
-      "id": "radius_card",
-      "label": "Roundness: FAQ + CTA cards",
-      "min": 0,
-      "max": 40,
-      "step": 1,
-      "unit": "px",
-      "default": 14
-    },
-    {
-      "type": "range",
-      "id": "radius_button",
-      "label": "Roundness: CTA buttons",
-      "min": 0,
-      "max": 40,
-      "step": 1,
-      "unit": "px",
-      "default": 8
-    },
-    {
-      "type": "range",
-      "id": "radius_icon",
-      "label": "Roundness: icons",
-      "min": 0,
-      "max": 50,
-      "step": 1,
-      "unit": "%",
-      "default": 50,
-      "info": "50% is a circle, 0% is a square. The CTA card icon stays slightly squarer than the rest."
+      "content": "Appearance",
+      "info": "Accent color, font size and roundness moved to the Faqly app → Settings → Appearance, where there is a live preview and the choices survive a theme change. Nothing to set here."
     }
   ]
 }

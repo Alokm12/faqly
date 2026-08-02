@@ -20,12 +20,62 @@ api_version = "2026-10"
   topics = [ "app/uninstalled" ]
   uri = "/webhooks/app/uninstalled"
 
+  # app_subscriptions/update: a merchant can cancel, pause, or have a charge
+  # decline entirely inside Shopify's admin without opening Faqly. Without
+  # this, the cached plan would keep granting paid AI credits to someone who
+  # stopped paying. See app/routes/webhooks.app.subscriptions_update.jsx.
+  [[webhooks.subscriptions]]
+  topics = [ "app_subscriptions/update" ]
+  uri = "/webhooks/app/subscriptions_update"
+
+  # MANDATORY COMPLIANCE WEBHOOKS.
+  # Every public app must implement all three; a missing one is an automatic
+  # App Store rejection. Faqly stores no customer data, so the two customer
+  # topics acknowledge and return — but the endpoints must exist and must
+  # verify the HMAC, which is what Shopify actually tests.
+  #
+  # shop/redact is the real one: it fires 48h after uninstall and is the only
+  # place in this app that genuinely deletes a shop's content. Until then the
+  # uninstall handler deliberately preserves it so a reinstall restores
+  # everything.
+  [[webhooks.subscriptions]]
+  topics = [ "customers/data_request" ]
+  uri = "/webhooks/customers/data_request"
+
+  [[webhooks.subscriptions]]
+  topics = [ "customers/redact" ]
+  uri = "/webhooks/customers/redact"
+
+  [[webhooks.subscriptions]]
+  topics = [ "shop/redact" ]
+  uri = "/webhooks/shop/redact"
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-# read_themes: lets the dashboard check whether the FAQ widget app block is
-# actually present on the live theme, so we can deep-link merchants to the
-# theme editor when it isn't. Read-only — we never write theme files.
-scopes = "write_products,write_metaobjects,write_metaobject_definitions,read_themes"
+#
+# EVERY SCOPE HERE IS ACTUALLY EXERCISED. App Store review checks that an app
+# requests only what it uses, and a merchant approving an install deserves the
+# same. Each line below names the code that needs it.
+#
+#   read_products  models/Faq.server.js hydrates the product and collection
+#                  titles a FAQ is pinned to, and services/store-context.server.js
+#                  reads product details to ground AI generation. Both are
+#                  reads — this app never creates or edits a product, which is
+#                  why this is no longer write_products.
+#   write_files    routes/app.categories.upload-icon.jsx uploads category icons
+#                  via stagedUploadsCreate + fileCreate. Generic file uploads
+#                  need this scope; write_products does not cover them.
+#   read_themes    services/theme-widget.server.js checks whether the FAQ app
+#                  block is present on the live theme so the dashboard can
+#                  deep-link merchants to the theme editor when it isn't.
+#                  Read-only — we never write theme files.
+#
+# REMOVED: write_metaobjects, write_metaobject_definitions. The metaobject
+# mirror is switched off (MIRROR_ENABLED = false in
+# services/metaobject-sync.server.js) and nothing on the storefront reads it.
+# If you ever turn the mirror on, add both scopes back here — the sync code
+# will fail silently without them.
+scopes = "read_products,write_files,read_themes"
 
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]

@@ -354,7 +354,7 @@ function StatsRow({ categories, totalFaqs, uncategorizedCount }) {
         icon={<SearchIcon />}
         context={
           uncategorizedCount > 0 ? (
-            <s-link href="/app">Sort them into categories</s-link>
+            <s-link href="/app/faqs">Sort them into categories</s-link>
           ) : (
             <s-text tone="subdued">All FAQs are grouped</s-text>
           )
@@ -732,7 +732,7 @@ export default function Categories() {
 
   return (
     <s-page heading="Categories">
-      <s-link slot="secondary-actions" href="/app">
+      <s-link slot="secondary-actions" href="/app/faqs">
         Back to FAQs
       </s-link>
       <s-button

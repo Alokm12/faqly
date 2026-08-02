@@ -137,6 +137,10 @@ function normalizeFaq(row, resources = new Map()) {
     // results — otherwise a FAQ pinned to a product that failed to load
     // would silently turn into a store-wide FAQ and appear on every page.
     isStoreWide: productIds.length === 0 && collectionIds.length === 0,
+    // Provenance. Drives the "AI" badge on the list and the low-confidence
+    // warning on the editor.
+    source: row.source ?? "manual",
+    aiConfidence: row.aiConfidence ?? null,
   };
 }
 
@@ -215,6 +219,13 @@ export async function saveFaq(handle, faq, ctx) {
     collectionIds: serializeIds(faq.collectionIds),
   };
 
+  // Provenance is only written when the caller states it, so an ordinary edit
+  // of a generated FAQ does not silently relabel it as manual.
+  if (faq.source !== undefined) data.source = normalizeSource(faq.source);
+  if (faq.aiConfidence !== undefined) {
+    data.aiConfidence = normalizeConfidence(faq.aiConfidence);
+  }
+
   if (faq.position !== undefined) data.position = Number(faq.position) || 0;
   if (faq.categoryHandle !== undefined) {
     data.categoryId = await resolveCategoryId(faq.categoryHandle, ctx.shop);
@@ -234,6 +245,109 @@ export async function saveFaq(handle, faq, ctx) {
 
   await syncFaq(row, ctx);
   return { id: row.id, handle: row.handle };
+}
+
+/* ------------------------------------------------------------------ */
+/* Bulk create — AI-generated drafts                                   */
+/* ------------------------------------------------------------------ */
+
+const SOURCES = new Set(["manual", "ai"]);
+const CONFIDENCES = new Set(["high", "medium", "low"]);
+
+function normalizeSource(value) {
+  return SOURCES.has(value) ? value : "manual";
+}
+
+function normalizeConfidence(value) {
+  return CONFIDENCES.has(value) ? value : null;
+}
+
+/**
+ * Inserts several FAQs at once. Used only by the AI generator.
+ *
+ * HANDLE COLLISIONS ARE REAL HERE. `generateHandle` suffixes the slug with
+ * `Date.now().toString(36)`, which has millisecond resolution — inserting
+ * eight FAQs in one tight loop can produce eight identical suffixes, and
+ * `@@unique([shop, handle])` then rejects all but the first. Two generated
+ * FAQs phrased similarly enough to slugify the same would collide too. So
+ * each row gets an index suffix, and a P2002 is retried once with a fresh
+ * handle rather than losing the row.
+ *
+ * Rows are created sequentially rather than with `createMany` because each
+ * one needs its category resolved and its metaobject mirror written, and
+ * because a partial success is a better outcome than an all-or-nothing
+ * transaction that discards seven good FAQs over one bad handle.
+ *
+ * @param {Array<object>} rows
+ * @param {object} ctx
+ * @returns {Promise<{created: Array, failed: number}>}
+ */
+export async function createManyFaqs(rows, ctx) {
+  if (!Array.isArray(rows) || !rows.length) return { created: [], failed: 0 };
+
+  // New drafts go after everything that already exists, in the order the
+  // model produced them.
+  const last = await prisma.faq.findFirst({
+    where: { shop: ctx.shop },
+    orderBy: { position: "desc" },
+    select: { position: true },
+  });
+  let position = (last?.position ?? -1) + 1;
+
+  const created = [];
+  let failed = 0;
+
+  for (const [index, row] of rows.entries()) {
+    const question = String(row.question ?? "").trim();
+    const answer = String(row.answer ?? "").trim();
+    if (!question || !answer) {
+      failed += 1;
+      continue;
+    }
+
+    const categoryId = await resolveCategoryId(row.categoryHandle, ctx.shop);
+
+    const data = {
+      shop: ctx.shop,
+      question,
+      answer,
+      // Never negotiable: generated content is a draft. There is no code
+      // path that lets the generator publish.
+      status: FaqStatus.DRAFT,
+      source: normalizeSource(row.source ?? "ai"),
+      aiConfidence: normalizeConfidence(row.aiConfidence),
+      categoryId,
+      productIds: serializeIds(row.productIds),
+      collectionIds: serializeIds(row.collectionIds),
+      position: position++,
+    };
+
+    let inserted = null;
+    for (let attempt = 0; attempt < 2 && !inserted; attempt += 1) {
+      // The index disambiguates same-millisecond handles; the attempt
+      // counter disambiguates the retry from the original.
+      const handle = `${generateHandle(question)}-${index}${attempt ? `-${attempt}` : ""}`;
+      try {
+        inserted = await prisma.faq.create({
+          data: { ...data, handle },
+          include: { category: true },
+        });
+      } catch (error) {
+        if (error?.code !== "P2002") throw error;
+        // Handle taken — loop and try a fresh one.
+      }
+    }
+
+    if (!inserted) {
+      failed += 1;
+      continue;
+    }
+
+    await syncFaq(inserted, ctx);
+    created.push(normalizeFaq(inserted));
+  }
+
+  return { created, failed };
 }
 
 /**

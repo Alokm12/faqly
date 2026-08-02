@@ -9,8 +9,39 @@
 -- regenerate the baseline instead of hand-porting it:
 --   rm -rf prisma/migrations && npx prisma migrate dev --name init
 
+-- CreateTable
+-- The migration is named "create_session_table" but never created it: the
+-- table was produced by an early `prisma db push` and only the index was ever
+-- captured here. That made this migration unappliable to any fresh database —
+-- `prisma migrate deploy` died on "no such table: main.Session" before a
+-- single table was created, so the app could not be deployed to new hosting
+-- at all.
+--
+-- Both statements are IF NOT EXISTS so this is safe in both directions: a
+-- fresh database gets the table, and a database that already has one (every
+-- existing dev and production install) is untouched.
+CREATE TABLE IF NOT EXISTS "Session" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "shop" TEXT NOT NULL,
+    "state" TEXT NOT NULL,
+    "isOnline" BOOLEAN NOT NULL DEFAULT false,
+    "scope" TEXT,
+    "expires" DATETIME,
+    "accessToken" TEXT NOT NULL,
+    "userId" BIGINT,
+    "firstName" TEXT,
+    "lastName" TEXT,
+    "email" TEXT,
+    "accountOwner" BOOLEAN NOT NULL DEFAULT false,
+    "locale" TEXT,
+    "collaborator" BOOLEAN DEFAULT false,
+    "emailVerified" BOOLEAN DEFAULT false,
+    "refreshToken" TEXT,
+    "refreshTokenExpires" DATETIME
+);
+
 -- CreateIndex
-CREATE INDEX "Session_shop_idx" ON "Session"("shop");
+CREATE INDEX IF NOT EXISTS "Session_shop_idx" ON "Session"("shop");
 
 -- CreateTable
 CREATE TABLE "Shop" (

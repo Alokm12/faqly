@@ -139,29 +139,6 @@ export async function saveCategory(handle, category, ctx) {
   return { id: row.id, handle: row.handle };
 }
 
-export async function updateCategoryFields(id, fields, ctx) {
-  const data = {};
-  if (fields.position !== undefined) data.position = Number(fields.position) || 0;
-  if (fields.name !== undefined) data.name = String(fields.name);
-  if (fields.color !== undefined) data.color = sanitizeHexColor(fields.color);
-  if (fields.icon !== undefined) data.icon = String(fields.icon);
-  if (fields.iconImageUrl !== undefined) {
-    data.iconImageUrl = sanitizeImageUrl(fields.iconImageUrl);
-  }
-
-  if (!Object.keys(data).length) return null;
-
-  const result = await prisma.category.updateMany({
-    where: { id, shop: ctx.shop },
-    data,
-  });
-  if (!result.count) return null;
-
-  const row = await prisma.category.findUnique({ where: { id } });
-  await syncCategory(row, ctx);
-  return { id: row.id };
-}
-
 export async function reorderCategories(orderedIds, ctx) {
   if (!Array.isArray(orderedIds) || !orderedIds.length) return;
 

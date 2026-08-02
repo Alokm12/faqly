@@ -13,6 +13,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { dataContext } from "../models/context.server";
 import { exportBackup, importBackup } from "../services/backup.server";
+import { toUserMessage } from "../models/errors";
 import {
   importFromMetaobjects,
   inspectDefinitions,
@@ -88,7 +89,17 @@ export const action = async ({ request }) => {
       return { toast: stats.skipped ? "Mirror is off" : "Mirror rebuilt", resync: stats };
     }
   } catch (error) {
-    return { error: error.message || "Something went wrong" };
+    // Validation the merchant can act on — a wrong file, a newer backup
+    // version — is a UserError and comes through verbatim. A JSON parse
+    // failure, a dead database or a Prisma mismatch does not: it is logged
+    // in full server-side and shown as one sentence.
+    return {
+      error: toUserMessage(
+        error,
+        "Something went wrong. Please try again.",
+        `Data action (${intent})`,
+      ),
+    };
   }
 
   return null;
@@ -144,7 +155,7 @@ export default function DataPage() {
 
   return (
     <s-page heading="Data & backup">
-      <s-link slot="breadcrumbs" href="/app">
+      <s-link slot="breadcrumbs" href="/app/faqs">
         ← FAQs
       </s-link>
 
@@ -163,7 +174,7 @@ export default function DataPage() {
               categor{categoryCount === 1 ? "y" : "ies"} saved for {shopDomain}.
             </s-text>
             <s-text tone="subdued">
-              This data lives in Faqly's own database. Uninstalling the app no
+              This data lives in Faqly&apos;s own database. Uninstalling the app no
               longer deletes it — reinstall and everything comes back.
             </s-text>
           </s-stack>
@@ -194,7 +205,7 @@ export default function DataPage() {
               value={importMode}
               onChange={(e) => setImportMode(e.target.value)}
             >
-              <s-option value="skip">Keep what's here (safe)</s-option>
+              <s-option value="skip">Keep what&apos;s here (safe)</s-option>
               <s-option value="overwrite">Overwrite with the backup</s-option>
             </s-select>
 
@@ -228,7 +239,7 @@ export default function DataPage() {
               Earlier versions of Faqly stored FAQs in Shopify metaobjects,
               which Shopify deletes when an app is uninstalled. Run this once to
               pull anything still there into the database. It never overwrites
-              an existing FAQ, so it's safe to run twice.
+              an existing FAQ, so it&apos;s safe to run twice.
             </s-text>
 
             <s-stack direction="block" gap="small-200">
@@ -293,7 +304,7 @@ export default function DataPage() {
             <s-text tone="subdued">
               Optional. Copies FAQs into Shopify metaobjects so a theme can
               render them in Liquid — needed later for indexable FAQ structured
-              data. The storefront widget doesn't need it.
+              data. The storefront widget doesn&apos;t need it.
             </s-text>
             {lastSyncAt ? (
               <s-text tone="subdued">

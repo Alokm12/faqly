@@ -6,8 +6,18 @@
 
 import { authenticate } from "../shopify.server";
 import { getStorefrontFaqs } from "../services/storefront-faqs.server";
+import { sanitizeAppearance, SETTINGS_DEFAULTS } from "../models/Settings.server";
 
-const EMPTY = { categories: [], poweredByVisible: true };
+// The fallback payload carries a full appearance object too. The widget
+// applies `appearance` unconditionally, so shipping it half-populated on
+// the not-installed / error paths would leave the wrapper with some custom
+// properties set and others missing — which renders worse than the plain
+// stylesheet defaults do.
+const EMPTY = {
+  categories: [],
+  poweredByVisible: true,
+  appearance: sanitizeAppearance(SETTINGS_DEFAULTS),
+};
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.public.appProxy(request);

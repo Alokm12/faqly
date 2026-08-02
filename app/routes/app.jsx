@@ -22,10 +22,13 @@ export default function App() {
   return (
     <AppProvider embedded apiKey={apiKey}>
       <s-app-nav>
-        <s-link href="/app">FAQs</s-link>
+        <s-link href="/app">Dashboard</s-link>
+        <s-link href="/app/faqs">FAQs</s-link>
         <s-link href="/app/categories">Categories</s-link>
+        <s-link href="/app/assistant">AI Assistant</s-link>
         <s-link href="/app/settings">Settings</s-link>
         <s-link href="/app/data">Data & backup</s-link>
+        <s-link href="/app/billing">Plans & billing</s-link>
       </s-app-nav>
       <Outlet />
     </AppProvider>

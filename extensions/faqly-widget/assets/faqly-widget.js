@@ -372,6 +372,138 @@
     }
   }
 
+  /**
+   * Appearance now arrives in the App Proxy payload instead of being
+   * interpolated into a style attribute by Liquid, because theme block
+   * settings vanish when a merchant changes theme.
+   *
+   * The values are re-validated here even though the server already
+   * clamps and pattern-matches them. Custom properties accept nearly any
+   * token stream, so an unvalidated number could carry `;background:url(…)`
+   * out of the widget and into an outbound request from every product
+   * page. Same reasoning as safeColor above — the storefront does not
+   * trust the payload just because we sent it.
+   */
+  var RADIUS_PROPS = {
+    radiusWidget: ["--faqly-radius-widget", "px", 0, 60],
+    radiusTabbar: ["--faqly-radius-tabbar", "px", 0, 60],
+    radiusPill: ["--faqly-radius-pill", "px", 0, 40],
+    radiusCard: ["--faqly-radius-card", "px", 0, 40],
+    radiusButton: ["--faqly-radius-button", "px", 0, 40],
+    radiusIcon: ["--faqly-radius-icon", "%", 0, 50],
+  };
+
+  function applyAppearance(widgetEl, appearance) {
+    if (!appearance) return;
+
+    var accent = safeColor(appearance.accentColor);
+    if (accent) widgetEl.style.setProperty("--faqly-accent", accent);
+
+    var fontSize = parseInt(appearance.fontSize, 10);
+    if (isFinite(fontSize)) {
+      fontSize = Math.min(22, Math.max(12, fontSize));
+      widgetEl.style.setProperty("--faqly-font-size", fontSize + "px");
+    }
+
+    Object.keys(RADIUS_PROPS).forEach(function (key) {
+      var spec = RADIUS_PROPS[key];
+      var value = parseInt(appearance[key], 10);
+      if (!isFinite(value)) return;
+      value = Math.min(spec[3], Math.max(spec[2], value));
+      widgetEl.style.setProperty(spec[0], value + spec[1]);
+    });
+  }
+
+  function matchesQuery(faq, needle) {
+    if (!needle) return true;
+    return (
+      (faq.question || "").toLowerCase().indexOf(needle) !== -1 ||
+      (faq.answer || "").toLowerCase().indexOf(needle) !== -1
+    );
+  }
+
+  /**
+   * Builds the storefront search field.
+   *
+   * Accessibility, in the order it matters:
+   *  - a real <label>, visually hidden, so the input is named without the
+   *    placeholder having to do that job (a placeholder disappears the
+   *    moment you type, taking the only label with it);
+   *  - the result count lives in a role="status" region tied to the input
+   *    with aria-describedby, so it is both announced when it changes and
+   *    readable on demand;
+   *  - that announcement is debounced while filtering stays instant. A
+   *    status region updated on every keystroke interrupts itself
+   *    continuously and ends up reading nothing at all.
+   */
+  function renderSearch(widgetEl, config, onQuery) {
+    var searchEl = widgetEl.querySelector("[data-faqly-search]");
+    if (!searchEl) return;
+
+    if (!config.enabled) {
+      searchEl.hidden = true;
+      return;
+    }
+
+    clear(searchEl);
+    searchEl.hidden = false;
+
+    var inputId = "faqly-search-" + ++idCounter;
+    var statusId = inputId + "-status";
+
+    var label = el("label", "faqly-search__label", config.placeholder);
+    label.setAttribute("for", inputId);
+
+    var field = el("div", "faqly-search__field");
+
+    var icon = el("span", "faqly-search__icon");
+    icon.setAttribute("aria-hidden", "true");
+
+    var input = document.createElement("input");
+    input.type = "search";
+    input.id = inputId;
+    input.className = "faqly-search__input";
+    // Placeholder is merchant free text; setting it as a property rather
+    // than building markup means it can never be parsed as HTML.
+    input.placeholder = config.placeholder;
+    input.setAttribute("autocomplete", "off");
+    input.setAttribute("aria-describedby", statusId);
+
+    var status = el("p", "faqly-search__status");
+    status.id = statusId;
+    status.setAttribute("role", "status");
+
+    field.appendChild(icon);
+    field.appendChild(input);
+    searchEl.appendChild(label);
+    searchEl.appendChild(field);
+    searchEl.appendChild(status);
+
+    var announceTimer = null;
+
+    input.addEventListener("input", function () {
+      var query = input.value.trim().toLowerCase();
+      var count = onQuery(query);
+
+      if (announceTimer) clearTimeout(announceTimer);
+      announceTimer = setTimeout(function () {
+        if (!query) {
+          // Empty rather than "showing everything": with no query there is
+          // no result to report, and leaving stale text under the box
+          // reads as a filter still being applied.
+          status.textContent = "";
+          return;
+        }
+        status.textContent =
+          count === 0
+            ? "No FAQs match “" + input.value.trim() + "”"
+            : count === 1
+              ? "1 FAQ matches"
+              : count + " FAQs match";
+      }, 350);
+    });
+  }
+
   function initWidget(widgetEl) {
     warnIfStylesheetMissing(widgetEl);
     var listEl = widgetEl.querySelector("[data-faqly-list]");
@@ -402,20 +534,76 @@
         var categories = (data && data.categories) || [];
         var poweredByVisible = data && data.poweredByVisible !== false;
         var showCredit = poweredByVisible && showCreditTheme;
+        var appearance = (data && data.appearance) || null;
+
+        // Applied before the early return so a store with no FAQs still
+        // renders its empty state in the merchant's own accent and type.
+        applyAppearance(widgetEl, appearance);
 
         if (categories.length === 0) {
           renderMessage(listEl, emptyText);
           return;
         }
 
-        function renderAll(filterKey) {
-          clear(listEl);
-          var toShow =
-            filterKey === "__all__"
+        // The category pill and the search box are two filters over one
+        // list, so both live in one place and one render reads both.
+        // Threading the query through renderAll's argument instead would
+        // reset the search every time a pill was clicked.
+        var state = { filterKey: "__all__", query: "" };
+
+        function visibleCategories() {
+          var scoped =
+            state.filterKey === "__all__"
               ? categories
               : categories.filter(function (c) {
-                  return c.key === filterKey;
+                  return c.key === state.filterKey;
                 });
+
+          if (!state.query) return scoped;
+
+          // Rebuilt rather than mutated: `categories` is the unfiltered
+          // source of truth for every later keystroke.
+          return scoped
+            .map(function (category) {
+              var faqs = category.faqs.filter(function (faq) {
+                return matchesQuery(faq, state.query);
+              });
+              if (!faqs.length) return null;
+              return {
+                key: category.key,
+                name: category.name,
+                icon: category.icon,
+                color: category.color,
+                faqs: faqs,
+              };
+            })
+            .filter(Boolean);
+        }
+
+        function renderAll() {
+          clear(listEl);
+          var toShow = visibleCategories();
+          var matches = 0;
+          toShow.forEach(function (category) {
+            matches += category.faqs.length;
+          });
+
+          if (!toShow.length) {
+            // Distinct from emptyText: "nothing matched your search" and
+            // "this page has no FAQs" are different facts, and showing the
+            // second for the first is what makes a search box feel broken.
+            renderMessage(
+              listEl,
+              state.query
+                ? "No FAQs match your search."
+                : emptyText,
+            );
+            return matches;
+          }
+
+          // Headings are suppressed while searching only when a single
+          // group survives — with several, the merchant's grouping is the
+          // fastest way to read a result set.
           var showHeadings = toShow.length > 1;
           toShow.forEach(function (category) {
             listEl.appendChild(renderCategorySection(category, showHeadings));
@@ -423,10 +611,34 @@
           if (showCredit) {
             listEl.appendChild(el("p", "faqly-widget__credit", creditText));
           }
+          return matches;
         }
 
-        var defaultKey = renderPills(widgetEl, categories, renderAll, allTabLabel);
-        renderAll(defaultKey);
+        state.filterKey = renderPills(
+          widgetEl,
+          categories,
+          function (key) {
+            state.filterKey = key;
+            renderAll();
+          },
+          allTabLabel,
+        );
+
+        renderSearch(
+          widgetEl,
+          {
+            enabled: !appearance || appearance.searchEnabled !== false,
+            placeholder:
+              (appearance && appearance.searchPlaceholder) ||
+              "Search for answers…",
+          },
+          function (query) {
+            state.query = query;
+            return renderAll();
+          },
+        );
+
+        renderAll();
       })
       .catch(function (error) {
         // Previously this rendered emptyText, so a dead proxy, a 500, or

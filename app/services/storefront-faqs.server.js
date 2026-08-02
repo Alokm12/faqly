@@ -7,7 +7,7 @@
 // read.
 
 import prisma from "../db.server";
-import { SETTINGS_DEFAULTS } from "../models/Settings.server";
+import { SETTINGS_DEFAULTS, sanitizeAppearance } from "../models/Settings.server";
 import { sanitizeHexColor } from "../models/Category.server";
 
 function parseIds(value) {
@@ -115,5 +115,14 @@ export async function getStorefrontFaqs(shop, { productId, collectionIds }) {
     poweredByVisible:
       setting?.poweredByVisible ?? SETTINGS_DEFAULTS.poweredByVisible,
     schemaEnabled: setting?.schemaEnabled ?? SETTINGS_DEFAULTS.schemaEnabled,
+    // Appearance used to come from theme block settings, interpolated into
+    // the wrapper's style attribute by Liquid. It travels with the FAQ
+    // payload now so it survives a theme change — see the Setting model.
+    //
+    // sanitizeAppearance runs here rather than being trusted from the
+    // column: this is the last hop before the values become CSS custom
+    // properties in a shopper's browser, and rows predating that
+    // validation are still out there.
+    appearance: sanitizeAppearance(setting ?? SETTINGS_DEFAULTS),
   };
 }

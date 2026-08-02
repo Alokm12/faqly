@@ -21,7 +21,7 @@ import { useNavigate } from "react-router";
 const FONT_STACK =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
 
-export const MENU_ITEM_STYLE = {
+const MENU_ITEM_STYLE = {
   display: "block",
   width: "100%",
   textAlign: "left",
@@ -35,10 +35,12 @@ export const MENU_ITEM_STYLE = {
   textDecoration: "none",
 };
 
-export function MoreOptionsButton({ children }) {
+function MoreOptionsButton({ children, buttonRef, ...rest }) {
   return (
     <button
       type="button"
+      ref={buttonRef}
+      {...rest}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -81,6 +83,26 @@ export function PortalMenu({ items, label = "More options" }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // The menu is positioned once, in fixed coordinates, so any scroll or
+  // resize leaves it floating away from the button that opened it. Closing
+  // is the honest response — repositioning mid-scroll would chase the row
+  // around the screen, and this is a menu, not a tooltip.
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = () => setOpen(false);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+
+  // Runs after the portal has mounted, so menuRef is populated.
+  useEffect(() => {
+    if (open) menuRef.current?.focus();
+  }, [open]);
+
   const toggleOpen = () => {
     if (!open && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
@@ -92,15 +114,43 @@ export function PortalMenu({ items, label = "More options" }) {
     setOpen((o) => !o);
   };
 
+  // Escape closes and hands focus back to the trigger. Without the second
+  // half, closing the menu drops focus onto <body> and a keyboard user has
+  // to tab from the top of the page to get back to where they were.
+  const handleKeyDown = (event) => {
+    if (event.key !== "Escape") return;
+    event.stopPropagation();
+    setOpen(false);
+    buttonRef.current?.focus();
+  };
+
   return (
     <>
-      <div ref={buttonRef} onClick={toggleOpen}>
-        <MoreOptionsButton>{label}</MoreOptionsButton>
-      </div>
+      {/* The ref and the handler live on the button itself. They used to be
+          on a wrapping <div>, which worked only because a keyboard
+          activation of the inner button happens to bubble a click event —
+          accidental, and invisible to any audit. */}
+      <MoreOptionsButton
+        buttonRef={buttonRef}
+        onClick={toggleOpen}
+        onKeyDown={handleKeyDown}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        {label}
+      </MoreOptionsButton>
       {open &&
         createPortal(
           <div
             ref={menuRef}
+            role="menu"
+            aria-label={label}
+            // Focus moves into the menu when it opens — that is what a
+            // menu is expected to do, it is what makes the Escape handler
+            // below reachable from the keyboard, and it is what lets Tab
+            // walk the items instead of continuing past them into the page.
+            tabIndex={-1}
+            onKeyDown={handleKeyDown}
             style={{
               position: "fixed",
               top: coords.top,
@@ -117,8 +167,9 @@ export function PortalMenu({ items, label = "More options" }) {
           >
             {items.map((item, i) => (
               <button
-                key={i}
+                key={item.label ?? i}
                 type="button"
+                role="menuitem"
                 style={{
                   ...MENU_ITEM_STYLE,
                   ...(item.destructive ? { color: "#DC2626" } : {}),

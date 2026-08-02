@@ -19,6 +19,7 @@
 // rather than failing the merchant's save.
 
 import prisma from "../db.server";
+import { UserError } from "../models/errors";
 
 const FAQ_TYPE = "$app:faq";
 const CATEGORY_TYPE = "$app:faq_category";
@@ -87,11 +88,11 @@ async function runMutation(query, variables, ctx) {
   const response = await ctx.graphql(query, { variables });
   const { data, errors } = await response.json();
   if (errors?.length) {
-    throw new Error(errors.map((e) => e.message).join(", "));
+    throw new UserError(errors.map((e) => e.message).join(", "));
   }
   const result = data?.metaobjectUpsert ?? data?.metaobjectDelete;
   if (result?.userErrors?.length) {
-    throw new Error(result.userErrors.map((e) => e.message).join(", "));
+    throw new UserError(result.userErrors.map((e) => e.message).join(", "));
   }
   return result;
 }

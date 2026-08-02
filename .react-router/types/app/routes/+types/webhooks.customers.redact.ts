@@ -2,10 +2,10 @@
 
 import type { GetInfo, GetAnnotations } from "react-router/internal";
 
-type Module = typeof import("../app.additional.js")
+type Module = typeof import("../webhooks.customers.redact.js")
 
 type Info = GetInfo<{
-  file: "routes/app.additional.jsx",
+  file: "routes/webhooks.customers.redact.jsx",
   module: Module
 }>
 
@@ -13,11 +13,8 @@ type Matches = [{
   id: "root";
   module: typeof import("../../root.js");
 }, {
-  id: "routes/app";
-  module: typeof import("../app.js");
-}, {
-  id: "routes/app.additional";
-  module: typeof import("../app.additional.js");
+  id: "routes/webhooks.customers.redact";
+  module: typeof import("../webhooks.customers.redact.js");
 }];
 
 type Annotations = GetAnnotations<Info & { module: Module, matches: Matches }>;

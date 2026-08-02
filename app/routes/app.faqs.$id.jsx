@@ -22,6 +22,9 @@ import {
 import { getCategories } from "../models/Category.server";
 import { getSettings } from "../models/Settings.server";
 import { FaqStatus } from "../models/faq-status";
+import { aiConfigured } from "../services/ai.server";
+import { AnswerAssistant } from "../components/AnswerAssistant";
+import { AppStyles } from "../components/ui";
 
 export const loader = async ({ request, params }) => {
   const { admin, session } = await authenticate.admin(request);
@@ -41,6 +44,8 @@ export const loader = async ({ request, params }) => {
       products: [],
       collections: [],
       categories,
+      // Read server-side; only the boolean crosses to the browser.
+      aiEnabled: aiConfigured(),
     };
   }
 
@@ -48,7 +53,7 @@ export const loader = async ({ request, params }) => {
   if (!faq) {
     throw new Response("FAQ not found", { status: 404 });
   }
-  return { ...faq, categories };
+  return { ...faq, categories, aiEnabled: aiConfigured() };
 };
 
 export const action = async ({ request, params }) => {
@@ -61,7 +66,7 @@ export const action = async ({ request, params }) => {
 
   if (data.action === "delete") {
     await deleteFaq(data.id, ctx);
-    return redirect("/app?deletedFaq=1");
+    return redirect("/app/faqs?deletedFaq=1");
   }
 
   if (data.action === "duplicate") {
@@ -215,8 +220,13 @@ export default function FaqForm() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isNew = !initialData.handle;
-  const { categories, products: initialProducts, collections: initialCollections, ...initialFaq } =
-    initialData;
+  const {
+    categories,
+    products: initialProducts,
+    collections: initialCollections,
+    aiEnabled,
+    ...initialFaq
+  } = initialData;
 
   const [formState, setFormState] = useState(initialFaq);
   const [products, setProducts] = useState(initialProducts);
@@ -293,12 +303,15 @@ export default function FaqForm() {
 
   return (
     <s-page heading={isNew ? "Create FAQ" : "Edit FAQ"}>
-      <s-link slot="breadcrumbs" href="/app">
+      <s-link slot="breadcrumbs" href="/app/faqs">
         ← FAQs
       </s-link>
       <s-button slot="primary-action" onClick={handleSave} variant="primary">
         Save
       </s-button>
+
+      <AppStyles />
+
       {!isNew && (
         <>
           <s-button slot="secondary-actions" onClick={handleDuplicate}>
@@ -345,6 +358,15 @@ export default function FaqForm() {
               />
             </div>
             <AnswerCounter text={formState.answer} />
+            {aiEnabled && (
+              <AnswerAssistant
+                question={formState.question}
+                answer={formState.answer}
+                onReplace={(next) =>
+                  setFormState((current) => ({ ...current, answer: next }))
+                }
+              />
+            )}
           </div>
 
           <s-select

@@ -141,6 +141,57 @@ const SEED_FAQS = [
   },
 ];
 
+/* ------------------------------------------------------------------ */
+/* Telling starter content apart from the merchant's own               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The dashboard needs this distinction and it is not cosmetic.
+ *
+ * Seeding runs on install, so by the time a merchant first opens the app
+ * they already have 17 FAQs and 5 categories. A setup checklist that marks
+ * "create your first FAQ" done because `count > 0` would be complete
+ * before they have done anything — it would be measuring our own writes.
+ * Worse, the answers above contain invented policies ("30 days", "free
+ * over $50"); a dashboard that reports "17 FAQs" and nothing else lets a
+ * merchant activate the widget and put those numbers in front of real
+ * shoppers.
+ *
+ * Seed handles are deliberately stable slugs (`faqly-<category>-<n>`)
+ * while merchant handles always end in a base-36 timestamp, so the two are
+ * distinguishable without adding a column. The category list is derived
+ * from SEED_CATEGORIES rather than hardcoded so the two cannot drift.
+ */
+const SEED_FAQ_HANDLE = new RegExp(
+  `^faqly-(${SEED_CATEGORIES.map((c) => c.handle).join("|")})-\\d+$`,
+);
+const SEED_CATEGORY_HANDLES = new Set(SEED_CATEGORIES.map((c) => c.handle));
+
+export function isSeedFaqHandle(handle) {
+  return SEED_FAQ_HANDLE.test(handle || "");
+}
+
+export function isSeedCategoryHandle(handle) {
+  return SEED_CATEGORY_HANDLES.has(handle || "");
+}
+
+/**
+ * True when a row has not been written since it was created.
+ *
+ * Prisma sets `createdAt` (@default(now())) and `updatedAt` (@updatedAt) in
+ * the same INSERT, so on a freshly seeded row they are equal — but they are
+ * two separate client-side values, so an exact `===` is not something to
+ * rely on. Two seconds is far below any plausible human edit (seeding
+ * finishes before the first page render) and far above any clock jitter
+ * between the two assignments.
+ */
+export function isUnedited(row) {
+  if (!row?.createdAt || !row?.updatedAt) return false;
+  return new Date(row.updatedAt) - new Date(row.createdAt) < 2000;
+}
+
+export const SEED_FAQ_COUNT = SEED_FAQS.length;
+
 /**
  * Creates the starter set for a shop. Idempotent by design: it does
  * nothing at all if the shop already has any FAQs, so it can never

@@ -18,9 +18,9 @@ export default function App() {
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>A short heading about [your app]</h1>
+        <h1 className={styles.heading}>Faqly — FAQs for your Shopify store</h1>
         <p className={styles.text}>
-          A tagline about [your app] that describes your value proposition.
+          Answer your customers before they open a support ticket.
         </p>
         {showForm && (
           <Form className={styles.form} method="post" action="/auth/login">
@@ -36,16 +36,16 @@ export default function App() {
         )}
         <ul className={styles.list}>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Organised by category</strong>. Group questions the way
+            shoppers ask them, and they become filter tabs on your storefront.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Targeted to products</strong>. Pin an FAQ to a product or
+            collection so it only shows where it is relevant.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Styled to match</strong>. Set the accent colour, type size
+            and roundness in the app, with a live preview.
           </li>
         </ul>
       </div>

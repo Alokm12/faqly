@@ -50,6 +50,22 @@ module.exports = {
       },
       rules: {
         "react/no-unknown-property": ["error", { ignore: ["variant"] }],
+
+        // OFF DELIBERATELY.
+        //
+        // This app does not use the `prop-types` package anywhere, and
+        // adding it to every component would add a runtime dependency and
+        // several hundred lines of declarations to catch mistakes that a
+        // one-file-per-route codebase surfaces immediately anyway.
+        //
+        // The reason it is disabled rather than tolerated: it was firing
+        // ~185 times, and `tsconfig.json` only includes .ts/.tsx, so
+        // `tsc --noEmit` never looks at a single .jsx file in this app.
+        // That makes ESLint the only automated check these files get, and
+        // real findings — an unescaped entity, an unused variable, a
+        // keyboard-inaccessible click handler — were being buried in the
+        // noise. A lint run nobody can read is a lint run nobody reads.
+        "react/prop-types": "off",
       },
     },
 

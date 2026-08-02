@@ -26,18 +26,25 @@ import {
   buildWidgetDeepLink,
 } from "../services/theme-widget.server";
 import { PortalMenu } from "../components/PortalMenu";
+import { AppStyles, Tag } from "../components/ui";
+import { AiCreditMeter } from "../components/AiCreditMeter";
+import { AiGenerateModal } from "../components/AiGenerateModal";
+import { AiReviewList } from "../components/AiReviewList";
+import { getPlan } from "../models/ShopPlan.server";
+import { aiConfigured } from "../services/ai.server";
 
 const APP_VERSION = "1.0.0";
 
 export const loader = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
   const ctx = await dataContext({ session, admin });
-  const [faqs, categories, widget] = await Promise.all([
+  const [faqs, categories, widget, plan] = await Promise.all([
     getFaqs(ctx),
     getCategories(ctx),
     // Never throws — returns { status: "unknown" } on any failure, which
     // renders no banner. See services/theme-widget.server.js.
     getWidgetThemeStatus(ctx.graphql),
+    getPlan(ctx.shop),
   ]);
   return {
     faqs,
@@ -46,6 +53,15 @@ export const loader = async ({ request }) => {
       ...widget,
       deepLink: buildWidgetDeepLink(session.shop),
     },
+    plan,
+    // Resolved in the loader, not the component: the provider key must never
+    // be referenced from code that ships to the browser. Only this boolean
+    // crosses over.
+    //
+    // `plan` is also required — it comes back null when the Prisma client
+    // predates the ShopPlan model, and an AI panel with no credit balance to
+    // show is worse than no panel.
+    aiEnabled: aiConfigured() && Boolean(plan),
   };
 };
 
@@ -173,7 +189,7 @@ const EmptyFaqState = () => (
       <s-grid justifyItems="center" maxInlineSize="450px">
         <s-heading>Create your first FAQ</s-heading>
         <s-paragraph>
-          Answer your customers' most common questions right on your storefront.
+          Answer your customers&apos; most common questions right on your storefront.
         </s-paragraph>
         <s-stack gap="small-200" justifyContent="center" padding="base" paddingBlockEnd="none" direction="inline">
           <s-button href="/app/faqs/new" variant="primary">Create FAQ</s-button>
@@ -208,7 +224,7 @@ function WidgetNotInstalledBanner({ widget }) {
   return (
     <s-banner tone="warning" heading="Your FAQ widget isn't on your live theme yet">
       <s-paragraph>
-        FAQs you create here won't appear on your storefront until the Faqly
+        FAQs you create here won&apos;t appear on your storefront until the Faqly
         block is added to
         {widget.themeName ? ` your live theme (${widget.themeName})` : " your live theme"}.
         Adding it takes one click — then hit Save in the theme editor.
@@ -403,12 +419,22 @@ function FaqRow({ faq, dragDisabled, isDragging, isDragOver, onDragStart, onDrag
   useEffect(() => { if (statusFetcher.data?.toast) shopify.toast.show(statusFetcher.data.toast); }, [statusFetcher.data, shopify]);
   useEffect(() => { if (deleteFetcher.data?.toast) shopify.toast.show(deleteFetcher.data.toast); }, [deleteFetcher.data, shopify]);
 
-  const toggleStatus = () =>
-    statusFetcher.submit({ intent: "toggleStatus", id: faq.id, status: faq.status }, { method: "POST" });
-  const handleDelete = () =>
-    deleteFetcher.submit({ intent: "deleteFaq", id: faq.id }, { method: "POST" });
-
   const isBusy = statusFetcher.state !== "idle" || deleteFetcher.state !== "idle";
+
+  // The guards are why `isBusy` exists. Without them a second click while
+  // the first request is still in flight fires the action again — harmless
+  // for a status toggle, but a second delete submits an id that no longer
+  // exists and surfaces as an error toast for a row the merchant already
+  // successfully removed.
+  const toggleStatus = () => {
+    if (isBusy) return;
+    statusFetcher.submit({ intent: "toggleStatus", id: faq.id, status: faq.status }, { method: "POST" });
+  };
+  const handleDelete = () => {
+    if (isBusy) return;
+    deleteFetcher.submit({ intent: "deleteFaq", id: faq.id }, { method: "POST" });
+  };
+
   const isPublished = faq.status === "PUBLISHED";
 
   return (
@@ -463,7 +489,17 @@ function FaqRow({ faq, dragDisabled, isDragging, isDragOver, onDragStart, onDrag
         </div>
       </s-table-cell>
       <s-table-cell>
-        <s-link href={`/app/faqs/${faq.handle}`}>{truncate(faq.question, 55)}</s-link>
+        <s-stack direction="inline" gap="small-200" alignItems="center">
+          <s-link href={`/app/faqs/${faq.handle}`}>{truncate(faq.question, 55)}</s-link>
+          {/* Provenance, not decoration: a merchant reviewing what to publish
+              needs to know which rows a model wrote. The word "AI" carries
+              it, so the badge survives greyscale and a screen reader. */}
+          {faq.source === "ai" && (
+            <Tag tone={faq.aiConfidence === "low" ? "caution" : "info"}>
+              {faq.aiConfidence === "low" ? "AI — needs review" : "AI"}
+            </Tag>
+          )}
+        </s-stack>
       </s-table-cell>
       <s-table-cell>
         <s-badge tone={faq.isStoreWide ? "info" : "default"}>{scopeLabel(faq)}</s-badge>
@@ -617,7 +653,7 @@ function AppFooter() {
 }
 
 export default function Index() {
-  const { faqs, categories, widget } = useLoaderData();
+  const { faqs, categories, widget, plan, aiEnabled } = useLoaderData();
   const shopify = useAppBridge();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -625,12 +661,49 @@ export default function Index() {
   const [sortKey, setSortKey] = useState("custom");
   const [statusFilter, setStatusFilter] = useState("all");
 
+  // "closed" → "picking" → "reviewing". The generated drafts live in this
+  // fetcher's data until the merchant keeps them; nothing has touched the
+  // database at this point.
+  const [aiPanel, setAiPanel] = useState("closed");
+  const aiFetcher = useFetcher();
+
+  const aiBusy = aiFetcher.state !== "idle";
+  const aiDrafts = aiFetcher.data?.drafts ?? null;
+  const aiPlan = aiFetcher.data?.plan ?? plan;
+
   useEffect(() => {
     if (searchParams.get("deletedFaq")) {
       shopify.toast.show("FAQ deleted");
       navigate(".", { replace: true });
     }
   }, [searchParams, shopify, navigate]);
+
+  // Drafts arriving flips the panel to review; a successful save closes it
+  // and revalidates the list so the new rows appear.
+  useEffect(() => {
+    if (aiFetcher.state !== "idle" || !aiFetcher.data) return;
+    if (aiFetcher.data.drafts) {
+      setAiPanel("reviewing");
+    } else if (aiFetcher.data.saved !== undefined) {
+      shopify.toast.show(aiFetcher.data.toast ?? "Draft FAQs added");
+      setAiPanel("closed");
+      navigate(".", { replace: true });
+    }
+  }, [aiFetcher.state, aiFetcher.data, shopify, navigate]);
+
+  const startGeneration = ({ productId, count }) => {
+    aiFetcher.submit(
+      { intent: "generate", productId: productId ?? "", count: String(count) },
+      { method: "POST", action: "/app/ai/generate" },
+    );
+  };
+
+  const keepDrafts = (kept) => {
+    aiFetcher.submit(
+      { intent: "keep", drafts: JSON.stringify(kept) },
+      { method: "POST", action: "/app/ai/generate" },
+    );
+  };
 
   const filteredFaqs = useMemo(() => {
     let result = faqs;
@@ -664,10 +737,71 @@ export default function Index() {
         Create FAQ
       </s-button>
 
+      <AppStyles />
+
       {/* Outside the empty/non-empty branch on purpose: a store with zero
           FAQs still needs to know the block is missing, and a store with
           fifty needs it even more. */}
       <WidgetNotInstalledBanner widget={widget} />
+
+      {/* The AI section sits above the list and outside the empty/non-empty
+          branch: generating is most useful precisely when there are no FAQs
+          yet. Hidden entirely without an API key rather than shown broken. */}
+      {aiEnabled && (
+        <div className="fq" style={{ marginBottom: "16px" }}>
+          {aiPanel === "closed" && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                flexWrap: "wrap",
+                background: "#FFFFFF",
+                border: "1px solid #E5E7EB",
+                borderRadius: "12px",
+                padding: "14px 16px",
+              }}
+            >
+              <AiCreditMeter plan={aiPlan} />
+              <span style={{ flex: "1 1 auto" }} />
+              {/* Out of credits is a dead end without somewhere to go, so the
+                  button becomes the way out rather than just greying out. */}
+              {aiPlan?.remaining === 0 ? (
+                <s-button variant="primary" href="/app/billing">
+                  Get more generations
+                </s-button>
+              ) : (
+                <s-button
+                  variant="primary"
+                  icon="wand"
+                  onClick={() => setAiPanel("picking")}
+                >
+                  Generate with AI
+                </s-button>
+              )}
+            </div>
+          )}
+
+          {aiPanel === "picking" && (
+            <AiGenerateModal
+              plan={aiPlan}
+              generating={aiBusy}
+              error={aiFetcher.data?.error ?? null}
+              onGenerate={startGeneration}
+              onCancel={() => setAiPanel("closed")}
+            />
+          )}
+
+          {aiPanel === "reviewing" && aiDrafts && (
+            <AiReviewList
+              drafts={aiDrafts}
+              saving={aiBusy}
+              onSave={keepDrafts}
+              onCancel={() => setAiPanel("closed")}
+            />
+          )}
+        </div>
+      )}
 
       {faqs.length === 0 ? (
         <EmptyFaqState />
@@ -720,7 +854,7 @@ export default function Index() {
 
           {sortKey !== "custom" && (
             <s-banner tone="info">
-              Drag-to-reorder is off while sorted by a non-custom order. Switch "Order by" back to "Custom order (drag)" to reorder.
+              Drag-to-reorder is off while sorted by a non-custom order. Switch &quot;Order by&quot; back to &quot;Custom order (drag)&quot; to reorder.
             </s-banner>
           )}
 

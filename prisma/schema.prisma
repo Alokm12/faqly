@@ -128,6 +128,16 @@ model Faq {
   metaobjectId String?
   syncedAt     DateTime?
 
+  /// "manual" | "ai" — how this FAQ came into existence. Drives the "AI"
+  /// badge on the list, and makes it possible to find every generated FAQ
+  /// later if a model turns out to have got something wrong.
+  source String @default("manual")
+
+  /// "high" | "medium" | "low"; null on manual FAQs. How well the grounding
+  /// data supported the generated answer — "low" means the text contains a
+  /// [MERCHANT: fill in] placeholder and must not be published as-is.
+  aiConfidence String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -149,7 +159,86 @@ model Setting {
   analyticsEnabled Boolean @default(true)
   defaultStatus    String  @default("DRAFT")
 
+  /// APPEARANCE — moved here from the theme app extension's block schema.
+  ///
+  /// Theme block settings live inside the theme's own JSON, so switching or
+  /// duplicating a theme silently discards every styling choice the
+  /// merchant made. Owning these here means the widget looks the same the
+  /// moment a new theme goes live, and it is what lets the Appearance tab
+  /// show a live preview.
+  ///
+  /// Every default below is byte-identical to the block-schema default it
+  /// replaces, so a merchant who never touched the theme editor sees no
+  /// change at all on upgrade.
+  ///
+  /// These reach a shopper's browser as CSS custom properties, so the
+  /// colour is sanitized and the numbers clamped on write AND again on the
+  /// way out — see Settings.server.js and storefront-faqs.server.js.
+  accentColor  String @default("#4A5D3A")
+  fontSize     Int    @default(16)
+  radiusWidget Int    @default(21)
+  radiusTabbar Int    @default(50)
+  radiusPill   Int    @default(40)
+  radiusCard   Int    @default(14)
+  radiusButton Int    @default(8)
+  radiusIcon   Int    @default(50)
+
+  /// Storefront search. `searchEnabled` gates the input entirely; the
+  /// placeholder is merchant free text and is escaped at the point it
+  /// becomes DOM, never interpolated into HTML.
+  searchEnabled     Boolean @default(true)
+  searchPlaceholder String  @default("Search for answers…")
+
   updatedAt DateTime @updatedAt
 
   shopRecord Shop @relation(fields: [shop], references: [domain], onDelete: Cascade)
+}
+
+/// Per-shop AI plan and credit balance.
+///
+/// DELIBERATELY NOT RELATED TO `Shop`. Uninstall never deletes a Shop row (it
+/// sets `uninstalledAt`), so a cascade would never fire anyway — and keeping
+/// this standalone means the credit balance survives any future change to how
+/// shop rows are reaped.
+///
+/// Credits reset lazily: the quota check compares `cycleResetAt` against now
+/// and rolls the window forward when it has passed. No cron job, so nothing
+/// silently stops resetting when a scheduler dies.
+model ShopPlan {
+  shop           String   @id
+  /// free | pro | advanced. Seeded manually for now.
+  plan           String   @default("free")
+  aiCreditsUsed  Int      @default(0)
+  aiCreditsLimit Int      @default(5)
+  cycleResetAt   DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+/// One row per Anthropic API call, success or failure.
+///
+/// Append-only, and independent of the Shop lifecycle for the same reason as
+/// ShopPlan: this is the audit trail for what the app spent on a merchant's
+/// behalf, and it should outlive any row it describes.
+model AiUsage {
+  id String @id @default(cuid())
+
+  shop    String
+  /// "generate" | "assist"
+  feature String
+  /// The model ID as sent, so a later model swap stays traceable.
+  model   String
+
+  inputTokens  Int   @default(0)
+  outputTokens Int   @default(0)
+  costUsd      Float @default(0)
+
+  success   Boolean @default(true)
+  /// Machine-readable failure reason: QUOTA_EXCEEDED, AI_TIMEOUT,
+  /// AI_INVALID_JSON, AI_UNAVAILABLE. Null on success.
+  errorCode String?
+
+  createdAt DateTime @default(now())
+
+  @@index([shop, createdAt])
 }

@@ -10,8 +10,9 @@
 
 import prisma from "../db.server";
 import { sanitizeHexColor, sanitizeImageUrl } from "../models/Category.server";
+import { UserError } from "../models/errors";
 
-export const BACKUP_VERSION = 1;
+const BACKUP_VERSION = 1;
 
 export async function exportBackup(ctx) {
   const [categories, faqs, setting] = await Promise.all([
@@ -84,10 +85,10 @@ export async function exportBackup(ctx) {
  */
 export async function importBackup(payload, ctx, mode = "skip") {
   if (!payload || payload.app !== "faqly") {
-    throw new Error("This file isn't a Faqly backup.");
+    throw new UserError("This file isn't a Faqly backup.");
   }
   if (payload.version > BACKUP_VERSION) {
-    throw new Error(
+    throw new UserError(
       `Backup was made by a newer version of Faqly (v${payload.version}). Update the app first.`,
     );
   }

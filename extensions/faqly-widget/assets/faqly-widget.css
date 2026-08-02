@@ -1,4 +1,23 @@
+/* APPEARANCE DEFAULTS
+   These used to be written into the block's style attribute by Liquid from
+   theme settings. Appearance is an app setting now (it survives a theme
+   change; theme JSON does not), and faqly-widget.js overwrites these from
+   the App Proxy payload as soon as it lands.
+
+   They are declared explicitly rather than left to the var() fallbacks
+   scattered through this file so that the pre-fetch paint is pixel-identical
+   to the old block-schema defaults — a store that never customised anything
+   sees no flicker at all, and one that did sees a single settle. */
 .faqly-widget {
+  --faqly-accent: #4A5D3A;
+  --faqly-font-size: 16px;
+  --faqly-radius-widget: 21px;
+  --faqly-radius-tabbar: 50px;
+  --faqly-radius-pill: 40px;
+  --faqly-radius-card: 14px;
+  --faqly-radius-button: 8px;
+  --faqly-radius-icon: 50%;
+
   max-width: 780px;
   margin: 3rem auto;
   padding: 3rem 2rem;
@@ -9,6 +28,90 @@
   --faqly-bg: #F6F8F2;
   --faqly-border: rgba(74, 93, 58, 0.12);
   --faqly-ink: #23301a;
+}
+
+/* --- Search --- */
+
+.faqly-search {
+  margin: 0 auto 1.25rem;
+  max-width: 520px;
+}
+
+.faqly-search[hidden] {
+  display: none;
+}
+
+/* Visually hidden, not display:none — the input still needs a name, and a
+   placeholder cannot be one because it vanishes the moment you type. */
+.faqly-search__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.faqly-search__field {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.9rem;
+  background: #fff;
+  border: 1px solid var(--faqly-border, rgba(74, 93, 58, 0.12));
+  border-radius: var(--faqly-radius-card, 14px);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.faqly-search__field:focus-within {
+  border-color: var(--faqly-accent, #4A5D3A);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--faqly-accent, #4A5D3A) 18%, transparent);
+}
+
+.faqly-search__icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  background: var(--faqly-accent, #4A5D3A);
+  opacity: 0.55;
+  /* A mask keeps the glyph tinted by the accent without shipping an image
+     request or an inline SVG per widget. */
+  -webkit-mask: var(--faqly-search-glyph) center / contain no-repeat;
+  mask: var(--faqly-search-glyph) center / contain no-repeat;
+  --faqly-search-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' d='M8.5 3a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Zm4 9.5L17 17'/%3E%3C/svg%3E");
+}
+
+.faqly-search__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.95em;
+  color: var(--faqly-ink, #23301a);
+  padding: 0.75rem 0;
+}
+
+.faqly-search__input::placeholder {
+  color: color-mix(in srgb, var(--faqly-ink, #23301a) 45%, transparent);
+}
+
+.faqly-search__status {
+  margin: 0.5rem 0 0;
+  min-height: 1.2em;
+  text-align: center;
+  font-size: 0.8em;
+  color: color-mix(in srgb, var(--faqly-ink, #23301a) 65%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faqly-search__field {
+    transition: none;
+  }
 }
 
 /* --- Eyebrow badge --- */

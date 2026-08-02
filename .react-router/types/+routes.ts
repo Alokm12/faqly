@@ -14,10 +14,22 @@ type Pages = {
   "/": {
     params: {};
   };
+  "/webhooks/app/subscriptions_update": {
+    params: {};
+  };
+  "/webhooks/customers/data_request": {
+    params: {};
+  };
   "/webhooks/app/scopes_update": {
     params: {};
   };
+  "/webhooks/customers/redact": {
+    params: {};
+  };
   "/webhooks/app/uninstalled": {
+    params: {};
+  };
+  "/webhooks/shop/redact": {
     params: {};
   };
   "/apps/faqly/faqs": {
@@ -40,12 +52,24 @@ type Pages = {
   "/app/categories": {
     params: {};
   };
+  "/app/dashboard/orphans": {
+    params: {};
+  };
   "/app/categories/:id": {
     params: {
       "id": string;
     };
   };
-  "/app/additional": {
+  "/app/ai/generate": {
+    params: {};
+  };
+  "/app/faqs": {
+    params: {};
+  };
+  "/app/ai/assist": {
+    params: {};
+  };
+  "/app/assistant": {
     params: {};
   };
   "/app/faqs/:id": {
@@ -56,6 +80,9 @@ type Pages = {
   "/app/settings": {
     params: {};
   };
+  "/app/billing": {
+    params: {};
+  };
   "/app/data": {
     params: {};
   };
@@ -64,15 +91,31 @@ type Pages = {
 type RouteFiles = {
   "root.jsx": {
     id: "root";
-    page: "/" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/apps/faqly/faqs" | "/auth/login" | "/auth/*" | "/app" | "/app/categories/upload-icon" | "/app/categories" | "/app/categories/:id" | "/app/additional" | "/app/faqs/:id" | "/app/settings" | "/app/data";
+    page: "/" | "/webhooks/app/subscriptions_update" | "/webhooks/customers/data_request" | "/webhooks/app/scopes_update" | "/webhooks/customers/redact" | "/webhooks/app/uninstalled" | "/webhooks/shop/redact" | "/apps/faqly/faqs" | "/auth/login" | "/auth/*" | "/app" | "/app/categories/upload-icon" | "/app/categories" | "/app/dashboard/orphans" | "/app/categories/:id" | "/app/ai/generate" | "/app/faqs" | "/app/ai/assist" | "/app/assistant" | "/app/faqs/:id" | "/app/settings" | "/app/billing" | "/app/data";
+  };
+  "routes/webhooks.app.subscriptions_update.jsx": {
+    id: "routes/webhooks.app.subscriptions_update";
+    page: "/webhooks/app/subscriptions_update";
+  };
+  "routes/webhooks.customers.data_request.jsx": {
+    id: "routes/webhooks.customers.data_request";
+    page: "/webhooks/customers/data_request";
   };
   "routes/webhooks.app.scopes_update.jsx": {
     id: "routes/webhooks.app.scopes_update";
     page: "/webhooks/app/scopes_update";
   };
+  "routes/webhooks.customers.redact.jsx": {
+    id: "routes/webhooks.customers.redact";
+    page: "/webhooks/customers/redact";
+  };
   "routes/webhooks.app.uninstalled.jsx": {
     id: "routes/webhooks.app.uninstalled";
     page: "/webhooks/app/uninstalled";
+  };
+  "routes/webhooks.shop.redact.jsx": {
+    id: "routes/webhooks.shop.redact";
+    page: "/webhooks/shop/redact";
   };
   "routes/apps.faqly.faqs.jsx": {
     id: "routes/apps.faqly.faqs";
@@ -92,7 +135,7 @@ type RouteFiles = {
   };
   "routes/app.jsx": {
     id: "routes/app";
-    page: "/app" | "/app/categories/upload-icon" | "/app/categories" | "/app/categories/:id" | "/app/additional" | "/app/faqs/:id" | "/app/settings" | "/app/data";
+    page: "/app" | "/app/categories/upload-icon" | "/app/categories" | "/app/dashboard/orphans" | "/app/categories/:id" | "/app/ai/generate" | "/app/faqs" | "/app/ai/assist" | "/app/assistant" | "/app/faqs/:id" | "/app/settings" | "/app/billing" | "/app/data";
   };
   "routes/app.categories.upload-icon.jsx": {
     id: "routes/app.categories.upload-icon";
@@ -102,13 +145,29 @@ type RouteFiles = {
     id: "routes/app.categories._index";
     page: "/app/categories";
   };
+  "routes/app.dashboard.orphans.jsx": {
+    id: "routes/app.dashboard.orphans";
+    page: "/app/dashboard/orphans";
+  };
   "routes/app.categories.$id.jsx": {
     id: "routes/app.categories.$id";
     page: "/app/categories/:id";
   };
-  "routes/app.additional.jsx": {
-    id: "routes/app.additional";
-    page: "/app/additional";
+  "routes/app.ai.generate.jsx": {
+    id: "routes/app.ai.generate";
+    page: "/app/ai/generate";
+  };
+  "routes/app.faqs._index.jsx": {
+    id: "routes/app.faqs._index";
+    page: "/app/faqs";
+  };
+  "routes/app.ai.assist.jsx": {
+    id: "routes/app.ai.assist";
+    page: "/app/ai/assist";
+  };
+  "routes/app.assistant.jsx": {
+    id: "routes/app.assistant";
+    page: "/app/assistant";
   };
   "routes/app.faqs.$id.jsx": {
     id: "routes/app.faqs.$id";
@@ -117,6 +176,10 @@ type RouteFiles = {
   "routes/app.settings.jsx": {
     id: "routes/app.settings";
     page: "/app/settings";
+  };
+  "routes/app.billing.jsx": {
+    id: "routes/app.billing";
+    page: "/app/billing";
   };
   "routes/app._index.jsx": {
     id: "routes/app._index";
@@ -130,8 +193,12 @@ type RouteFiles = {
 
 type RouteModules = {
   "root": typeof import("./app/root.jsx");
+  "routes/webhooks.app.subscriptions_update": typeof import("./app/routes/webhooks.app.subscriptions_update.jsx");
+  "routes/webhooks.customers.data_request": typeof import("./app/routes/webhooks.customers.data_request.jsx");
   "routes/webhooks.app.scopes_update": typeof import("./app/routes/webhooks.app.scopes_update.jsx");
+  "routes/webhooks.customers.redact": typeof import("./app/routes/webhooks.customers.redact.jsx");
   "routes/webhooks.app.uninstalled": typeof import("./app/routes/webhooks.app.uninstalled.jsx");
+  "routes/webhooks.shop.redact": typeof import("./app/routes/webhooks.shop.redact.jsx");
   "routes/apps.faqly.faqs": typeof import("./app/routes/apps.faqly.faqs.jsx");
   "routes/auth.login": typeof import("./app/routes/auth.login/route.jsx");
   "routes/_index": typeof import("./app/routes/_index/route.jsx");
@@ -139,10 +206,15 @@ type RouteModules = {
   "routes/app": typeof import("./app/routes/app.jsx");
   "routes/app.categories.upload-icon": typeof import("./app/routes/app.categories.upload-icon.jsx");
   "routes/app.categories._index": typeof import("./app/routes/app.categories._index.jsx");
+  "routes/app.dashboard.orphans": typeof import("./app/routes/app.dashboard.orphans.jsx");
   "routes/app.categories.$id": typeof import("./app/routes/app.categories.$id.jsx");
-  "routes/app.additional": typeof import("./app/routes/app.additional.jsx");
+  "routes/app.ai.generate": typeof import("./app/routes/app.ai.generate.jsx");
+  "routes/app.faqs._index": typeof import("./app/routes/app.faqs._index.jsx");
+  "routes/app.ai.assist": typeof import("./app/routes/app.ai.assist.jsx");
+  "routes/app.assistant": typeof import("./app/routes/app.assistant.jsx");
   "routes/app.faqs.$id": typeof import("./app/routes/app.faqs.$id.jsx");
   "routes/app.settings": typeof import("./app/routes/app.settings.jsx");
+  "routes/app.billing": typeof import("./app/routes/app.billing.jsx");
   "routes/app._index": typeof import("./app/routes/app._index.jsx");
   "routes/app.data": typeof import("./app/routes/app.data.jsx");
 };

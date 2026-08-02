@@ -75,12 +75,3 @@ export async function dataContext({ session, admin }) {
   await ensureShop(shop);
   return { shop, graphql: admin?.graphql ?? null };
 }
-
-/**
- * Same thing for App Proxy requests, where `authenticate.public.appProxy`
- * gives us the shop domain but we must NOT create a Shop row for a store
- * that has never installed the app.
- */
-export function publicContext({ shop, admin }) {
-  return { shop, graphql: admin?.graphql ?? null };
-}
